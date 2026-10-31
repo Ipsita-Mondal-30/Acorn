@@ -2,7 +2,7 @@
 
 > Acorn remembers what you discover and helps you actually do something with it.
 
-A personal multimodal memory and action agent built for the Meta Global AI Developer Hackathon.
+A personal multimodal memory and action agent .
 
 **CAPTURE → UNDERSTAND → REMEMBER → DECIDE → ACT → VERIFY → FOLLOW THROUGH**
 
