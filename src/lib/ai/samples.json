@@ -1,0 +1,90 @@
+[
+  {
+    "id": "job-listing",
+    "kind": "image",
+    "fileName": "job-listing-screenshot.png",
+    "mimeType": "image/png",
+    "label": "Job listing screenshot",
+    "blurb": "A screenshot of a data-engineering job post with a closing date.",
+    "style": {
+      "bar": "#0a66c2",
+      "title": "Jobs"
+    },
+    "pages": [
+      "Northwind Labs — Senior Data Engineer\nLocation: Remote (EU) or Lisbon\nAbout the role: Build the pipelines behind our logistics analytics product.\nRequirements:\n- 5+ years of experience with Python and SQL\n- Strong PostgreSQL skills: indexing and query tuning\n- Experience with Kafka or another streaming system\n- Nice to have: dbt or Airflow\nApplications close 15 January 2027.\nApply at https://jobs.example.com/northwind/data-engineer"
+    ]
+  },
+  {
+    "id": "recipe-reel",
+    "kind": "image",
+    "fileName": "instagram-recipe-screenshot.png",
+    "mimeType": "image/png",
+    "label": "Instagram recipe screenshot",
+    "blurb": "A screenshot of a recipe reel: ingredients and a caption.",
+    "style": {
+      "bar": "#c13584",
+      "title": "Instagram"
+    },
+    "pages": [
+      "@cookwithmira · Reel · 18.4K likes\nCreamy lemon garlic pasta — 15 minutes\nIngredients:\n- 200g spaghetti\n- 3 cloves garlic\n- 1 lemon (zest and juice)\n- 50g parmesan\n- 2 tbsp olive oil\nBoil the pasta, then simmer the garlic in olive oil for 2 minutes.\nSave this for the weekend!"
+    ],
+    "caption": "I want to try this at the weekend."
+  },
+  {
+    "id": "db-slide",
+    "kind": "image",
+    "fileName": "database-optimization-screenshot.png",
+    "mimeType": "image/png",
+    "label": "Database optimization screenshot",
+    "blurb": "A screenshot of a slide with Postgres indexing tips.",
+    "style": {
+      "bar": "#336791",
+      "title": "Slides"
+    },
+    "pages": [
+      "Postgres indexing: 5 rules that fixed our slow queries\n1. Run EXPLAIN ANALYZE before adding any index\n2. A B-tree index speeds up equality and range filters\n3. Use a GIN index for full-text search and jsonb\n4. A partial index keeps the index small: WHERE status = 'active'\n5. Avoid SELECT * and fetch only the columns you need\np95 query latency dropped from 840 ms to 90 ms."
+    ]
+  },
+  {
+    "id": "event-post",
+    "kind": "image",
+    "fileName": "event-post-screenshot.png",
+    "mimeType": "image/png",
+    "label": "Saved event post",
+    "blurb": "A screenshot of a LinkedIn-style event post with a date and RSVP deadline.",
+    "style": {
+      "bar": "#0a66c2",
+      "title": "LinkedIn"
+    },
+    "pages": [
+      "Rohan Mehta shared an event\nFounders & Builders Meetup — Bengaluru\nSaturday, 14 November 2026 · 5:30 PM\nIndiranagar Social Hub\nTalks on shipping AI products, followed by open networking.\nRSVP by 10 November: https://events.example.com/fb-meetup"
+    ]
+  },
+  {
+    "id": "product-idea",
+    "kind": "note",
+    "label": "Product idea note",
+    "blurb": "A typed note about a product idea.",
+    "text": "Product idea: a browser extension that turns every saved recipe into a shopping list grouped by supermarket aisle. Could charge ₹199/month. Need to research how grocery APIs handle product matching. I want to explore this next month."
+  },
+  {
+    "id": "paper-pdf",
+    "kind": "document",
+    "fileName": "sparse-routing-paper.pdf",
+    "mimeType": "application/pdf",
+    "label": "Research paper (PDF)",
+    "blurb": "A two-page PDF with an abstract and results. Facts keep their page numbers.",
+    "pages": [
+      "Sparse Routing for Long-Context Retrieval\nA. Verma and L. Okafor\nAbstract: We study retrieval over documents longer than 100 pages.\nOur sparse routing method improves recall by 12 percent over a dense baseline.\nWe release code and an evaluation set.",
+      "Results\nOn the long-document set, recall at 10 rose from 61 percent to 73 percent.\nLatency increased by 8 percent.\nConclusion: sparse routing is a practical way to read long documents.\nCode: https://example.org/sparse-routing"
+    ]
+  },
+  {
+    "id": "instagram-link",
+    "kind": "url",
+    "label": "Instagram link (private page)",
+    "blurb": "A saved Instagram link. Acorn can't see the post, only the link and your note.",
+    "url": "https://www.instagram.com/reel/Cxample123/",
+    "text": "Recipe reel from Mira. Want to try the pasta this weekend."
+  }
+]
