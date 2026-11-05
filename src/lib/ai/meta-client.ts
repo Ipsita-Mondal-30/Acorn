@@ -63,7 +63,9 @@ function fail(status: number, code: string, model: string): never {
   if (status === 402) throw new AiError("Meta API reports a billing problem (HTTP 402). Check billing for this key's team.", "billing");
   if (status === 404 && /model/i.test(code)) throw new AiError(`The model "${model}" isn't available to this API key. Check META_PRIMARY_MODEL.`, "model_unavailable");
   if (status === 413) throw new AiError("The file is too large for the Meta API.", "too_large");
+  if (status === 400 && /content_policy/i.test(code)) throw new AiError("Meta's safety filters blocked this request. Nothing was generated.", "bad_request");
   if (status === 400) throw new AiError("The model couldn't process this input (HTTP 400). The file may be corrupt, unsupported or too large.", "bad_request");
+  if (status === 406 || status === 415 || status === 422) throw new AiError(`Meta API rejected the request format (HTTP ${status}).`, "bad_request");
   if (status === 504) throw new AiError("The model took too long to answer (HTTP 504). Try a smaller file or reprocess.", "timeout");
   if (status === 429) throw new AiError("Meta API rate limit hit. Try again in a minute.", "rate_limit");
   throw new AiError(`Meta API request failed (HTTP ${status}).`, "unavailable");
@@ -171,4 +173,78 @@ export async function metaChat(env: Env, key: string, req: ChatRequest): Promise
     // JSON.parse messages include a snippet of the content — don't propagate them
     throw new AiError("Meta API returned output that is not valid JSON.", "malformed");
   }
+}
+
+
+/**
+ * The other Meta endpoints (speech to text, image generation, segmentation) use the same key, base URL, call budget,
+ * retry rules and logging as chat; only the path and body differ. This is the single place they are sent from.
+ * Returns the successful Response for the caller to read; every failure is mapped to an AiError.
+ */
+export type RawRequest = {
+  /** for logs only: "transcribe" | "image" | "segment" */
+  purpose: string;
+  model: string;
+  /** appended to META_API_BASE_URL, e.g. "/asr/transcribe" */
+  path: string;
+  /** built per attempt, because a FormData/stream body can only be sent once */
+  body: () => BodyInit;
+  headers?: Record<string, string>;
+  /** overrides META_TIMEOUT_MS for slow endpoints */
+  timeoutMs?: number;
+};
+
+export async function metaRequest(env: Env, key: string, req: RawRequest): Promise<{ res: Response; latencyMs: number; attempts: number }> {
+  assertRealCallsEnabled(env);
+  const started = Date.now();
+  const timeoutMs = req.timeoutMs ?? env.META_TIMEOUT_MS;
+  const log = (status: string | number, attempts: number) =>
+    console.info(`[meta] purpose=${req.purpose} model=${req.model} status=${status} attempts=${attempts} latencyMs=${Date.now() - started}`);
+
+  let res: Response | null = null;
+  let attempts = 0;
+  for (let attempt = 1; ; attempt++) {
+    attempts = attempt;
+    if (callsMade >= env.ACORN_MAX_MODEL_CALLS) {
+      throw new AiError(`Model call budget exhausted (${env.ACORN_MAX_MODEL_CALLS} calls this server run). Raise ACORN_MAX_MODEL_CALLS or restart the server.`, "budget");
+    }
+    callsMade++;
+    try {
+      res = await fetch(`${env.META_API_BASE_URL}${req.path}`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${key}`, ...req.headers },
+        body: req.body(),
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+    } catch (e) {
+      const timedOut = e instanceof Error && (e.name === "TimeoutError" || e.name === "AbortError");
+      log(timedOut ? "timeout" : "network-error", attempt);
+      recordCall(undefined, false);
+      if (timedOut) throw new AiError(`Meta API timed out after ${Math.round(timeoutMs / 1000)}s.`, "timeout");
+      if (attempt >= MAX_ATTEMPTS) throw new AiError("Could not reach the Meta API.", "network");
+      await sleep(retryDelayMs(null, attempt, env.ACORN_RETRY_BASE_MS));
+      continue;
+    }
+    if (RETRYABLE.has(res.status) && attempt < MAX_ATTEMPTS) {
+      void res.body?.cancel().catch(() => {});
+      log(res.status, attempt);
+      await sleep(retryDelayMs(res, attempt, env.ACORN_RETRY_BASE_MS));
+      continue;
+    }
+    break;
+  }
+  if (!res.ok) {
+    const code = await errorCode(res);
+    log(res.status, attempts);
+    recordCall(undefined, false);
+    return fail(res.status, code, req.model);
+  }
+  log(res.status, attempts);
+  recordCall(undefined, true);
+  return { res, latencyMs: Date.now() - started, attempts };
+}
+
+export function requireMetaKey(env: Env): string {
+  if (!env.META_API_KEY) throw new AiError("Meta mode is on but META_API_KEY is not set. Add it to .env.local or set AI_PROVIDER=mock.", "config");
+  return env.META_API_KEY;
 }

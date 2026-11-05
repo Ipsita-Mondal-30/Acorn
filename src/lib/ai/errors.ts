@@ -8,7 +8,8 @@ export type AiErrorKind =
   | "unavailable" // 500 / 503 after retries
   | "timeout" // our timeout, or HTTP 504
   | "network"
-  | "bad_request" // 400: bad parameters, corrupt or oversized input
+  | "bad_request" // 400 from Meta: bad parameters, corrupt or oversized input
+  | "invalid_input" // the user's own input is not usable (wrong file, empty target); fixable by them, so HTTP 400
   | "too_large" // 413
   | "truncated" // finish_reason "length"
   | "malformed" // not JSON, or JSON that fails our schema

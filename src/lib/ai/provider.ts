@@ -6,6 +6,7 @@ import { AiError } from "./errors";
 import { ActionPlan, AnswerOutput, IntentClassification } from "./outputs";
 import { metaProvider } from "./meta";
 import { mockProvider } from "./mock";
+import { replayEnabled, replayProvider } from "./replay";
 
 export { AiError } from "./errors";
 
@@ -60,6 +61,7 @@ export interface AiProvider {
 }
 
 export function getProvider(): AiProvider {
+  if (replayEnabled()) return replayProvider(); // demo only; see replay.ts
   return getEnv().ACORN_MODE === "meta" ? metaProvider() : mockProvider;
 }
 
