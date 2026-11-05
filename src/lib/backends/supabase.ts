@@ -1,6 +1,7 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { Plan, Reminder } from "../agent/schema";
+import { Artifact } from "../artifacts";
 import { CvDocument } from "../cv/types";
 import { DEFAULT_PREFS, Delivery, NotificationPrefs } from "../notify/types";
 import { Action, effective, Memory } from "../schema";
@@ -145,6 +146,16 @@ export function rowToPlan(row: Row): Plan {
   // the document is the source of truth; columns are copies for querying
   const r = Plan.safeParse({ ...(row.doc as Row), id: row.id, memoryId: row.memory_id, actionId: row.action_id, status: row.status });
   if (!r.success) throw new StoreError("A saved plan could not be read (unexpected format).");
+  return r.data;
+}
+
+export function artifactToRow(a: Artifact, userId: string): Row {
+  return { id: a.id, user_id: userId, memory_id: a.memoryId, parent_id: a.parentId, kind: a.kind, status: a.status, provider: a.provider, model: a.model, doc: a };
+}
+
+export function rowToArtifact(row: Row): Artifact {
+  const r = Artifact.safeParse({ ...(row.doc as Row), id: row.id, memoryId: row.memory_id, parentId: row.parent_id, status: row.status });
+  if (!r.success) throw new StoreError("A saved artifact could not be read (unexpected format).");
   return r.data;
 }
 
@@ -510,6 +521,41 @@ export function supabaseStore(c: SupabaseClient, userId: string): Store {
         if (rows.length) return rowToPlan(rows[0]);
       }
       throw new StoreError("This plan is being changed by someone else. Please try again.");
+    },
+
+    async listArtifacts(opts = {}) {
+      if ((opts.memoryId !== undefined && !isUuid(opts.memoryId)) || (opts.parentId !== undefined && !isUuid(opts.parentId))) return [];
+      let q = c.from("artifacts").select("*").order("created_at", { ascending: false });
+      if (opts.memoryId) q = q.eq("memory_id", opts.memoryId);
+      if (opts.parentId) q = q.eq("parent_id", opts.parentId);
+      if (opts.kind) q = q.eq("kind", opts.kind);
+      return (check(await q, "list artifacts") as Row[]).map(rowToArtifact);
+    },
+    async getArtifact(id) {
+      if (!isUuid(id)) return null;
+      const row = check(await c.from("artifacts").select("*").eq("id", id).maybeSingle(), "get artifact") as Row | null;
+      return row ? rowToArtifact(row) : null;
+    },
+    async upsertArtifact(a) {
+      const rows = check(await c.from("artifacts").upsert(artifactToRow(a, userId), { onConflict: "id" }).select(), "save artifact") as Row[];
+      return rowToArtifact(rows[0]);
+    },
+    async mutateArtifact(id, fn) {
+      if (!isUuid(id)) return null;
+      for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+        const cur = check(await c.from("artifacts").select("*").eq("id", id).maybeSingle(), "get artifact") as Row | null;
+        if (!cur) return null;
+        const next = fn(rowToArtifact(cur));
+        const changes = omit(artifactToRow(next, userId), ["id", "user_id", "memory_id", "parent_id"]);
+        const rows = check(await c.from("artifacts").update(changes).eq("id", id).eq("rev", cur.rev as number).select(), "update artifact") as Row[];
+        if (rows.length) return rowToArtifact(rows[0]);
+      }
+      throw new StoreError("This item is being changed by someone else. Please try again.");
+    },
+    async deleteArtifact(id) {
+      if (!isUuid(id)) return null;
+      const row = check(await c.from("artifacts").delete().eq("id", id).select(), "delete artifact") as Row[];
+      return row[0] ? rowToArtifact(row[0]) : null;
     },
 
     async listReminders(opts = {}) {

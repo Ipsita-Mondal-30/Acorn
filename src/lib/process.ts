@@ -5,7 +5,7 @@ import { AiError, extractValidated, getProvider, type ExtractInput } from "./ai/
 import { walledNote, walledPlatform } from "./platforms";
 import type { Memory } from "./schema";
 import { indexMemory } from "./indexing";
-import { claimProcessing, deleteMemory, hashContent, insertMemory, newId, updateMemory } from "./store";
+import { claimProcessing, deleteMemory, hashContent, insertMemory, listArtifacts, newId, updateMemory } from "./store";
 import { deleteUpload, estimatePdfPages, readUpload, saveUpload, UploadError } from "./uploads";
 import { fetchPage, parseSafeUrl, UrlError } from "./url";
 import { verifyExtraction } from "./verify";
@@ -44,7 +44,12 @@ export type CaptureInput =
   | { kind: "image"; bytes: Uint8Array; originalName: string; text?: string }
   | { kind: "document"; bytes: Uint8Array; originalName: string; text?: string };
 
-export async function captureMemory(input: CaptureInput): Promise<{ memory: Memory; created: boolean }> {
+/**
+ * Step 1 of capture: validate and PERSIST the original (the file first, then the row) and stop. The memory comes back
+ * "pending"; understanding it is a separate step (processMemory), so a slow or failing model can never lose a save.
+ * Saving the same content again returns the existing memory (`created: false`) instead of a duplicate.
+ */
+export async function saveCapture(input: CaptureInput): Promise<{ memory: Memory; created: boolean }> {
   const fields = CaptureFields.parse(input.kind === "image" || input.kind === "document" ? { kind: input.kind, text: input.text } : input);
   const now = new Date().toISOString();
   const base = { id: newId(), createdAt: now, updatedAt: now, status: "pending" as const, extraction: null, overrides: {}, isSample: false };
@@ -78,7 +83,14 @@ export async function captureMemory(input: CaptureInput): Promise<{ memory: Memo
     const r = await insertMemory(memory);
     if (!r.created) return r;
   }
-  return { memory: (await processMemory(memory.id)) ?? memory, created: true };
+  return { memory, created: true };
+}
+
+/** Save, then understand in the same call (samples, scripts and tests). The API route saves first and processes after replying. */
+export async function captureMemory(input: CaptureInput): Promise<{ memory: Memory; created: boolean }> {
+  const saved = await saveCapture(input);
+  if (!saved.created) return saved;
+  return { memory: (await processMemory(saved.memory.id)) ?? saved.memory, created: true };
 }
 
 const userMessage = (e: unknown) =>
@@ -174,8 +186,10 @@ export async function processMemory(id: string, opts: { force?: boolean } = {}):
 
 /** Delete a memory with its actions and (when it has one) its stored file. Returns false if it doesn't exist. */
 export async function removeMemory(id: string): Promise<boolean> {
-  const removed = await deleteMemory(id);
+  const artifactFiles = (await listArtifacts({ memoryId: id }).catch(() => [])).flatMap((a) => (a.fileName ? [a.fileName] : []));
+  const removed = await deleteMemory(id); // cascades to the memory's artifact rows
   if (!removed) return false;
   if (removed.source.fileName) await deleteUpload(removed.source.fileName);
+  for (const f of artifactFiles) await deleteUpload(f);
   return true;
 }

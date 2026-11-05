@@ -1,13 +1,15 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { ConfigError, readSupabaseConfig } from "@/lib/supabase/config";
+import { relativeLocation } from "@/lib/http/redirect";
 import { safeNext } from "@/lib/supabase/redirect";
 
 // Cloud mode only: refresh the Supabase session cookie on every page request and send signed-out visitors
 // to /login. In local demo mode (no Supabase configured, or ACORN_STORAGE=local) this does nothing.
 // /api routes are never redirected: they answer 401 themselves (see errorResponse), which is what a fetch() wants.
 
-const PUBLIC = ["/login", "/signup", "/auth"];
+// the manifest and its icons are fetched by the browser without cookies, so they can never sit behind a login redirect
+const PUBLIC = ["/login", "/signup", "/auth", "/manifest.webmanifest", "/pwa-icon"];
 const isPublic = (p: string) => PUBLIC.some((x) => p === x || p.startsWith(`${x}/`));
 
 export async function proxy(request: NextRequest) {
@@ -39,25 +41,25 @@ export async function proxy(request: NextRequest) {
   const signedIn = Boolean(data?.claims?.sub);
   const { pathname, search } = request.nextUrl;
 
-  if (!signedIn && !isPublic(pathname) && !pathname.startsWith("/api/")) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/login";
-    url.search = "";
-    url.searchParams.set("next", safeNext(pathname + search));
-    return redirectKeepingCookies(url, response);
+  // A share sheet POST must reach the route even when signed out: its body (the shared link or text) exists only in that
+  // request, so redirecting it here would lose it. The route saves nothing without a user (the store refuses first) and
+  // itself sends the person to sign in, carrying the shared link/text through to the capture form.
+  const isShareSheetPost = pathname === "/share" && request.method === "POST";
+  if (!signedIn && !isPublic(pathname) && !pathname.startsWith("/api/") && !isShareSheetPost) {
+    const next = encodeURIComponent(safeNext(pathname + search));
+    return redirectKeepingCookies(`/login?next=${next}`, response, request.method);
   }
   if (signedIn && (pathname === "/login" || pathname === "/signup")) {
-    const url = request.nextUrl.clone();
-    url.pathname = safeNext(request.nextUrl.searchParams.get("next"));
-    url.search = "";
-    return redirectKeepingCookies(url, response);
+    return redirectKeepingCookies(safeNext(request.nextUrl.searchParams.get("next")), response);
   }
   return response;
 }
 
 /** A redirect must carry any refreshed session cookies, or the user is logged out on the next request. */
-function redirectKeepingCookies(url: URL, from: NextResponse) {
-  const redirect = NextResponse.redirect(url);
+function redirectKeepingCookies(path: string, from: NextResponse, method = "GET") {
+  // a signed-out form POST must arrive at the login page as a GET, not be replayed as a POST (303). The Location is
+  // RELATIVE so it resolves against the address the browser used, never the origin's own (a tunnel's "localhost").
+  const redirect = new NextResponse(null, { status: method === "GET" || method === "HEAD" ? 307 : 303, headers: { location: relativeLocation(path) } });
   for (const c of from.cookies.getAll()) redirect.cookies.set(c);
   return redirect;
 }

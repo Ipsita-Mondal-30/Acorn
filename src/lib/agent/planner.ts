@@ -128,6 +128,24 @@ const GENERIC: Record<string, { items: string[]; user: string }> = {
   try: { items: ["Pick a time to try it", "Gather what you need", "Try it and note how it went"], user: "Try it, then note how it went" },
 };
 
+
+/** Learn: a study pack built from the memory's own facts, a revision reminder you date yourself, and your own study step. */
+function learnPlan(m: Memory): Step[] {
+  const v = effective(m);
+  return [
+    retrieve(m.id),
+    step({
+      id: "s2", kind: "tool", tool: "build_study_pack", title: "Build your study pack", why: "A session plan, revision notes, flashcards, practice questions and exercises, all from what this item says. Nothing is added from outside it.",
+      dependsOn: ["s1"],
+      input: { title: ref("s1", "title"), summary: ref("s1", "summary"), facts: ref("s1", "facts"), entities: ref("s1", "entities"), readableText: ref("s1", "readableText") },
+      reviewRequired: true, expected: "Notes, flashcards, practice questions and exercises that all trace to the saved item, none marked as learnt",
+      verification: "Rebuilt from the memory and compared; every quote and blanked word is found in the item", failureConditions: ["The memory has no facts or summary to study"],
+    }),
+    reminderStep("s3", m.id, `Revise: ${v.title.slice(0, 170)}`, null, ["s2"], "Optional. Pick when you want to revise (a few days later works well for flashcards).", "intent"),
+    userStep("s4", "Study it, then note what you learned", "Acorn can't study for you. Mark your progress in the pack, then record what you took away so this is tracked honestly.", ["s2"]),
+  ];
+}
+
 function followupPlan(m: Memory, now: Date): Step[] {
   const v = effective(m);
   const kind = v.intentKind ?? "other";
@@ -195,7 +213,7 @@ export function buildPlan(m: Memory, actionId: string, now: Date): Plan {
   if (m.status !== "ready" || !m.extraction) throw new PlanError("Acorn hasn't finished reading this memory yet.");
   if (!v.intentKind) throw new PlanError("Tell Acorn why you saved this first. Plans are only made for an intent you've confirmed, not for Acorn's guess.");
   const workflow = workflowFor(m) as Workflow;
-  const steps = workflow === "job_application" ? jobPlan(m, now) : workflow === "recipe" ? recipePlan(m) : followupPlan(m, now);
+  const steps = workflow === "job_application" ? jobPlan(m, now) : workflow === "recipe" ? recipePlan(m) : v.intentKind === "learn" ? learnPlan(m) : followupPlan(m, now);
   const goal =
     workflow === "job_application"
       ? `Prepare a truthful application for ${[m.extraction.job?.role, m.extraction.job?.company].filter(Boolean).join(" at ") || v.title}`

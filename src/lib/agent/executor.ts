@@ -19,6 +19,7 @@ import {
 import { buildPlan, isRef, PlanError } from "./planner";
 import { ChecklistItem } from "./job";
 import { rescale, ShoppingItem } from "./recipe";
+import { applyProgress, StudyPack, StudyProgress, withoutProgress } from "./study";
 import type { Plan, PlanStep, Verification } from "./schema";
 import { reverify, runTool, ToolError, type ToolCtxIn, type ToolIO } from "./tools";
 
@@ -321,6 +322,8 @@ export const StepEdit = z
     servings: z.number().positive().max(200).optional(),
     /** your answer on ambiguous matches, by requirement number: "confirmed" (it is true) or "rejected" (it is not) */
     decisions: z.record(z.string().regex(/^\d{1,2}$/), z.enum(["confirmed", "rejected"])).optional(),
+    /** study pack progress only (cards known / to review, questions answered, exercises done) */
+    study: StudyProgress.optional(),
     items: z.array(z.object({ id: z.string().max(40).optional(), text: z.string().trim().min(1).max(300).optional(), name: z.string().trim().min(1).max(200).optional(), quantity: z.number().positive().nullable().optional(), unit: z.string().max(20).nullable().optional(), done: z.boolean().optional(), checked: z.boolean().optional() }).strict()).min(1).max(80).optional(),
   })
   .strict();
@@ -333,6 +336,7 @@ const EDITABLE: Record<string, (keyof StepEdit)[]> = {
   draft_email: ["subject", "body"],
   create_checklist: ["items"],
   build_shopping_list: ["items", "servings"],
+  build_study_pack: ["study"],
 };
 
 /** Apply the user's edit. Items they add or reword are marked as theirs, so what Acorn extracted stays distinguishable. */
@@ -354,6 +358,16 @@ export function applyEdit(tool: string, output: Record<string, unknown>, edit: S
         results[Number(idx)] = { ...r, userDecision: decision };
       }
       next.results = results;
+      continue;
+    }
+    if (k === "study") {
+      try {
+        next.study = undefined;
+        Object.assign(next, applyProgress(StudyPack.parse(output), edit.study!));
+      } catch (e) {
+        throw new PlanError(e instanceof Error ? e.message : "That progress isn't valid.");
+      }
+      delete next.study;
       continue;
     }
     if (k === "servings") {
@@ -407,6 +421,17 @@ export async function editStep(planId: string, stepId: string, edit: StepEdit, n
   if (!plan) return null;
   live(plan);
   const s = stepOf(plan, stepId);
+  // marking study progress is not editing the pack: it stays possible after you accepted it, and it doesn't count as "edited by you"
+  const progressOnly = s.tool === "build_study_pack" && Object.keys(edit).every((k) => k === "study");
+  if (progressOnly && s.output && ["awaiting_review", "succeeded"].includes(s.state)) {
+    const next = applyEdit(s.tool!, s.output, edit);
+    const pack = StudyPack.parse(next);
+    if (JSON.stringify(withoutProgress(pack)) !== JSON.stringify(withoutProgress(StudyPack.parse(s.output)))) throw new PlanError("Progress can't change the content of the pack.");
+    return guarded(planId, (p) => {
+      live(p);
+      if (!["awaiting_review", "succeeded"].includes(stepOf(p, stepId).state)) throw new PlanError("This pack isn't available to update.");
+    }, (p) => patchStep(p, stepId, (x) => ({ ...x, output: next, history: [...x.history.slice(-40), event(now, "progress updated by you")] }), now), now);
+  }
   if (s.state !== "awaiting_review" || !s.output || !s.tool) throw new PlanError("Only a draft that is waiting for your review can be edited.");
   const edited = applyEdit(s.tool, s.output, edit);
   let output: Record<string, unknown>;

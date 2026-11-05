@@ -3,6 +3,7 @@ import { mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { z } from "zod";
 import { Plan, Reminder } from "../agent/schema";
+import { Artifact } from "../artifacts";
 import { CvDocument } from "../cv/types";
 import { DEFAULT_PREFS, Delivery, NotificationPrefs } from "../notify/types";
 import type { WorkerStore } from "../notify/worker";
@@ -26,6 +27,7 @@ const dbPath = () => path.join(dataDir(), "acorn.json");
 // the demo file also holds Phase 4 data; files written before it load with these empty
 const Db = BaseDb.extend({
   plans: z.array(Plan).default([]),
+  artifacts: z.array(Artifact).default([]),
   reminders: z.array(Reminder).default([]),
   cvDocuments: z.array(CvDocument).default([]),
   notificationPrefs: NotificationPrefs.nullable().default(null),
@@ -40,7 +42,7 @@ async function load(): Promise<Db> {
     return Db.parse(JSON.parse(await readFile(dbPath(), "utf8")));
   } catch (e) {
     if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e;
-    const seeded = { ...buildSeed(new Date()), plans: [], reminders: [], cvDocuments: [], notificationPrefs: null, deliveries: [] };
+    const seeded = { ...buildSeed(new Date()), plans: [], artifacts: [], reminders: [], cvDocuments: [], notificationPrefs: null, deliveries: [] };
     await save(seeded);
     return seeded;
   }
@@ -129,6 +131,7 @@ const store: Store = {
       db.actions = db.actions.filter((a) => a.memoryId !== id);
       db.embeddings = db.embeddings.filter((e) => e.memoryId !== id);
       db.plans = db.plans.filter((p) => p.memoryId !== id);
+      db.artifacts = db.artifacts.filter((a) => a.memoryId !== id);
       const gone = new Set(db.reminders.filter((r) => r.memoryId === id).map((r) => r.id));
       db.reminders = db.reminders.filter((r) => r.memoryId !== id);
       db.deliveries = db.deliveries.filter((d) => !d.reminderId || !gone.has(d.reminderId));
@@ -165,6 +168,34 @@ const store: Store = {
       return db.actions[i];
     }),
 
+  listArtifacts: (opts) =>
+    read((db) =>
+      db.artifacts
+        .filter((a) => (!opts?.memoryId || a.memoryId === opts.memoryId) && (!opts?.kind || a.kind === opts.kind) && (!opts?.parentId || a.parentId === opts.parentId))
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+    ),
+  getArtifact: (id) => read((db) => db.artifacts.find((a) => a.id === id) ?? null),
+  upsertArtifact: (a) =>
+    mutate((db) => {
+      const i = db.artifacts.findIndex((x) => x.id === a.id);
+      if (i < 0) db.artifacts.push(a);
+      else db.artifacts[i] = a;
+      return a;
+    }),
+  mutateArtifact: (id, fn) =>
+    mutate((db) => {
+      const i = db.artifacts.findIndex((x) => x.id === id);
+      if (i < 0) return null;
+      db.artifacts[i] = { ...fn(db.artifacts[i]), updatedAt: new Date().toISOString() };
+      return db.artifacts[i];
+    }),
+  deleteArtifact: (id) =>
+    mutate((db) => {
+      const i = db.artifacts.findIndex((x) => x.id === id);
+      if (i < 0) return null;
+      const [removed] = db.artifacts.splice(i, 1);
+      return removed;
+    }),
   listPlans: (memoryId) =>
     read((db) => db.plans.filter((p) => !memoryId || p.memoryId === memoryId).sort((a, b) => b.createdAt.localeCompare(a.createdAt))),
   getPlan: (id) => read((db) => db.plans.find((p) => p.id === id) ?? null),
@@ -275,10 +306,10 @@ const store: Store = {
     }),
 };
 
-const SAFE_NAME = /^[0-9a-f-]{36}\.(png|jpg|webp|gif|pdf|docx|txt)$/;
+const SAFE_NAME = /^[0-9a-f-]{36}\.(png|jpg|webp|gif|pdf|docx|txt|wav|svg)$/;
 const MIME = {
   png: "image/png", jpg: "image/jpeg", webp: "image/webp", gif: "image/gif", pdf: "application/pdf",
-  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", txt: "text/plain",
+  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", txt: "text/plain", wav: "audio/wav", svg: "image/svg+xml",
 } as const;
 
 const files: FileStore = {

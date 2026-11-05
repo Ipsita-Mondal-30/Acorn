@@ -1,4 +1,5 @@
 import type { Plan, Reminder, ReminderStatus } from "../agent/schema";
+import type { Artifact, ArtifactKind } from "../artifacts";
 import type { CvDocument } from "../cv/types";
 import type { Delivery, NotificationPrefs } from "../notify/types";
 import type { Action, Memory } from "../schema";
@@ -65,6 +66,15 @@ export interface Store {
   getReminder(id: string): Promise<Reminder | null>;
   upsertReminder(r: Reminder): Promise<Reminder>;
   mutateReminder(id: string, fn: (r: Reminder) => Reminder): Promise<Reminder | null>;
+
+  /** What Meta's voice, image and segmentation models made from memories (see artifacts.ts). */
+  listArtifacts(opts?: { memoryId?: string; kind?: ArtifactKind; parentId?: string }): Promise<Artifact[]>;
+  getArtifact(id: string): Promise<Artifact | null>;
+  upsertArtifact(a: Artifact): Promise<Artifact>;
+  /** Serialised read-modify-write on one artifact. */
+  mutateArtifact(id: string, fn: (a: Artifact) => Artifact): Promise<Artifact | null>;
+  /** Removes it and returns what was removed (so its stored file can be cleaned up), or null. */
+  deleteArtifact(id: string): Promise<Artifact | null>;
 
   /** The signed-in user's notification settings (defaults until they change something). */
   getPrefs(): Promise<NotificationPrefs>;

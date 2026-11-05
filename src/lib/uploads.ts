@@ -17,7 +17,7 @@ export class UploadError extends Error {
 
 const MIME = { png: "image/png", jpg: "image/jpeg", webp: "image/webp", gif: "image/gif", pdf: "application/pdf" } as const;
 type Ext = keyof typeof MIME;
-const SAFE_NAME = /^[0-9a-f-]{36}\.(png|jpg|webp|gif|pdf|docx|txt)$/;
+const SAFE_NAME = /^[0-9a-f-]{36}\.(png|jpg|webp|gif|pdf|docx|txt|wav|svg)$/;
 
 const startsWith = (b: Uint8Array, sig: number[], at = 0) => sig.every((x, i) => b[at + i] === x);
 const ascii = (s: string) => [...s].map((c) => c.charCodeAt(0));
@@ -31,6 +31,16 @@ function sniff(b: Uint8Array): Ext | null {
   if (startsWith(b, ascii("%PDF-"))) return "pdf";
   return null;
 }
+
+/** An Apple HEIC/HEIF photo (an ISO "ftyp" box with a HEIF brand). Acorn can't read these; saying so beats a vague "unsupported type". */
+export function isHeic(b: Uint8Array): boolean {
+  if (b.length < 12 || !startsWith(b, ascii("ftyp"), 4)) return false;
+  const brand = String.fromCharCode(...b.subarray(8, 12));
+  return ["heic", "heix", "hevc", "hevx", "heim", "heis", "mif1", "msf1"].includes(brand);
+}
+
+export const HEIC_MESSAGE =
+  "That photo is in Apple's HEIC format, which Acorn can't read yet. Pick it from the Photos picker on the capture page (Safari usually converts it), or share it as a JPEG.";
 
 /** What kind of upload these bytes are, judged by content alone. */
 export const uploadKind = (bytes: Uint8Array): UploadKind | null => {
@@ -51,6 +61,7 @@ export async function saveUpload(
   if (bytes.byteLength === 0) throw new UploadError("The file is empty.");
   const ext = sniff(bytes);
   const kind = ext === "pdf" ? "document" : ext ? "image" : null;
+  if (!ext && isHeic(bytes)) throw new UploadError(HEIC_MESSAGE);
   if (!ext || !kind || !allow.includes(kind)) {
     throw new UploadError(allow.includes("document") ? "Only PNG, JPEG, WebP or GIF images, and PDF documents, are supported." : "Only PNG, JPEG, WebP or GIF images are supported.");
   }
@@ -77,6 +88,20 @@ export async function saveCvFile(bytes: Uint8Array, kind: "pdf" | "docx" | "txt"
     await files.put(fileName, bytes, mimeType);
   } catch (e) {
     console.error(`[uploads] cv store failed: ${e instanceof Error ? e.message.slice(0, 300) : String(e)}`);
+    throw new UploadError(e instanceof StoreError ? e.message : "Couldn't store the file. Please try again.");
+  }
+  return { fileName, mimeType };
+}
+
+/** Store something Acorn generated or recorded (a voice note, a generated picture). Its type is fixed by the caller, not guessed from a user file. */
+export async function saveGenerated(bytes: Uint8Array, ext: "wav" | "png" | "webp" | "jpg" | "svg"): Promise<{ fileName: string; mimeType: string }> {
+  const mimeType = { wav: "audio/wav", png: "image/png", webp: "image/webp", jpg: "image/jpeg", svg: "image/svg+xml" }[ext];
+  const fileName = `${randomUUID()}.${ext}`;
+  const { files } = await backend();
+  try {
+    await files.put(fileName, bytes, mimeType);
+  } catch (e) {
+    console.error(`[uploads] generated store failed: ${e instanceof Error ? e.message.slice(0, 300) : String(e)}`);
     throw new UploadError(e instanceof StoreError ? e.message : "Couldn't store the file. Please try again.");
   }
   return { fileName, mimeType };

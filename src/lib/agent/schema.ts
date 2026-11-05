@@ -32,6 +32,7 @@ export const ToolName = z.enum([
   "draft_cover_letter",
   "draft_email",
   "create_checklist",
+  "build_study_pack",
   "create_reminder",
   "update_action_status",
 ]);
@@ -45,6 +46,9 @@ export const WORKFLOW_LABEL: Record<Workflow, string> = {
   recipe: "Recipe → shopping list",
   followup: "Follow-through plan",
 };
+
+/** "Learning plan" for a learn intent (it runs on the follow-through workflow, so no new stored workflow is needed). */
+export const workflowLabel = (workflow: Workflow, intentKind?: string | null) => (workflow === "followup" && intentKind === "learn" ? "Learning plan" : WORKFLOW_LABEL[workflow]);
 
 export const StepState = z.enum(["pending", "running", "awaiting_review", "succeeded", "failed", "skipped"]);
 export type StepState = z.infer<typeof StepState>;

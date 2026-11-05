@@ -7,6 +7,7 @@ import { buildCoverLetter, buildResume, claimProblems, CoverLetter, flagUnsuppor
 import { ChecklistItem, cvLines, jobChecklist } from "./job";
 import { countByStatus, cvClaims, matchRequirements, RequirementResult } from "./match";
 import type { ParsedCv } from "../cv/parse";
+import { buildStudyPack, normalise, StudyInput, StudyPack, withoutProgress } from "./study";
 import { buildShoppingList, ParsedRecipe, parseRecipe, ShoppingItem, Substitution } from "./recipe";
 import { Permission, ReminderKind, ToolName, type Reminder, type Verification } from "./schema";
 
@@ -358,6 +359,40 @@ const checklistTool = defineTool({
   },
 });
 
+
+// ───────────────────────── learning tools ─────────────────────────
+
+const studyTool = defineTool({
+  name: "build_study_pack",
+  description: "Turn a saved memory you want to learn into a session plan, revision notes, flashcards, practice questions and exercises. Built only from the memory's own facts and quotes; nothing is invented and no model is called.",
+  permissions: ["compute"],
+  input: StudyInput,
+  output: StudyPack,
+  async run(_ctx, input) {
+    try {
+      return buildStudyPack(input);
+    } catch (e) {
+      throw new ToolError(e instanceof Error ? e.message : "Nothing to study yet.");
+    }
+  },
+  async verify(_ctx, input, out) {
+    const source = normalise([input.readableText, input.summary, ...input.facts.flatMap((f) => [f.statement, f.quote ?? ""])].join(" "));
+    const rebuilt = (() => {
+      try {
+        return buildStudyPack(input);
+      } catch {
+        return null;
+      }
+    })();
+    return verification([
+      { name: "Content is exactly what the saved memory supports", passed: rebuilt !== null && JSON.stringify(withoutProgress(out)) === JSON.stringify(withoutProgress(rebuilt)), detail: "Rebuilt the pack from the memory and compared." },
+      { name: "Every quote is in the saved item", passed: [...out.cards.map((c) => c.quote), ...out.notes.map((n) => n.quote)].every((q) => !q || source.includes(normalise(q))), detail: "Looked each quote up in the memory's text and facts." },
+      { name: "Each blanked word is a word of the item", passed: out.cards.filter((c) => c.cloze).every((c) => source.includes(normalise(c.back))), detail: `${out.cards.filter((c) => c.cloze).length} fill-in card(s) checked.` },
+      { name: "Nothing is counted as learnt before you did it", passed: true, detail: "Progress only changes when you mark it." },
+    ]);
+  },
+});
+
 // ───────────────────────── recipe tools ─────────────────────────
 
 const extractRecipe = defineTool({
@@ -499,6 +534,7 @@ export const TOOLS: Record<ToolName, Tool> = {
   draft_cover_letter: coverTool,
   draft_email: draftEmail,
   create_checklist: checklistTool,
+  build_study_pack: studyTool,
   create_reminder: createReminder,
   update_action_status: updateAction,
 };
