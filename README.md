@@ -16,6 +16,11 @@ Acorn is a multimodal personal memory and follow-through agent. It helps people 
 8. [Prerequisites](#prerequisites)
 9. [Local setup — judge instructions](#local-setup--judge-instructions)
 10. [Live Meta API setup](#live-meta-api-setup)
+11. [Demo guide](#demo-guide)
+12. [Testing and quality](#testing-and-quality)
+13. [Known limitations](#known-limitations)
+14. [Privacy and security](#privacy-and-security)
+15. [Future scope](#future-scope)
 
 ## What Acorn is
 
@@ -362,3 +367,79 @@ Live calls are optional and use **your own** Meta Model API credentials. They ca
 **One-request checks (paid, optional).** `npm run meta:check` sends exactly one Muse Spark text request and refuses unless `AI_PROVIDER=meta`, `AI_ENABLE_REAL_CALLS=true` and `META_API_KEY` are set. The other checks need explicit confirmation on the command line, for example `META_LIVE_CONFIRM=voice META_KEY_ROTATED=yes npm run meta:live:voice` (also `image`, `sam`, `region`); each allows one attempt and writes a sanitised result to `artifacts/meta-live/` (gitignored). `npm run meta:live:dryrun` runs the same harness against a stubbed API with a fake key: no network, no cost.
 
 **Switch back to offline mode.** Set `AI_PROVIDER=mock` (or `AI_ENABLE_REAL_CALLS=false`) in `.env.local` and restart, or simply use `npm run demo`, which forces everything off. Remove your key from `.env.local` when you are done.
+
+## Demo guide
+
+Run `npm run demo` and open <http://localhost:3200>. In a fresh clone every reading below comes from Acorn's deterministic demo rules and says so on screen ("Demo extraction (mock, no AI model)", "Read by demo rules (no model)"). No step calls a live API. The built-in data is fictional and tagged **Sample**; it is not anyone's personal data.
+
+| # | Explore | What to do | What you should see | Produced by |
+|---|---|---|---|---|
+| 1 | Home | Open the home page | A greeting, what is waiting for you, deadlines, unfinished intentions and "Noticed in what you saved", built from the sample memories | Deterministic logic over stored data |
+| 2 | Capture | Capture → Image → **Try a sample** → *Job listing screenshot*. Also try the quick-note box on Home, the *Research paper (PDF)* sample, and the *Instagram link (private page)* sample | The item is saved first (the original screenshot is kept), then read; the page updates by itself when reading finishes. The link sample is never fetched | Original stored as uploaded; demo rules |
+| 3 | Processing and understanding | Open the saved job listing | Title "Senior Data Engineer at Northwind Labs", four requirements, the deadline 15 Jan 2027, eight facts each with its quote, and "Acorn's guess · not confirmed: Pursue this opportunity" | Demo rules. In Meta mode the same page is filled by Muse Spark 1.3 (with the saved file present, this sample shows the labelled replay of a real Muse Spark result instead) |
+| 4 | Retrieval | Search (magnifier icon) → use one of the **Try** suggestions, e.g. *what did I want to do with the Lumen job*, or type *job listing about Kafka and PostgreSQL* after step 2 | Ranked matches, each with a "why it matched" line. A query using none of the saved words shows "Nothing matched …", and Ask Acorn answers that it couldn't find a matching memory instead of guessing (keyword search only in the demo) | Deterministic keyword search and citation-checked answers |
+| 5 | Related memories | On the job listing: **What Aiko noticed** and **Connected memories** | Links to the *Fernway Health* job and the *Postgres cheatsheet* samples, with reasons such as "Both mention “kafka”" | Deterministic: shared entities, topics, site |
+| 6 | Today | Open <http://localhost:3200/today> | Each line has a "Why:" line, e.g. "This date was found in what you saved. There's no plan or reminder for it yet." | Deterministic logic over stored data |
+| 7 | Approval-gated plan (learning) | Capture → Voice → record a few seconds → **Transcribe** (the demo returns an empty transcript and says so) → type *I want to learn Redis, build a project around it and finish it this week.* → **Save as a memory** → open it → **Yes, learn it** → **Make a plan** → review the steps and permissions → **Approve and run** | Nothing runs before approval. A study pack (notes, flashcards, questions) built from the memory's own facts; tick progress and pick a revision date yourself | Deterministic plan template, tools and study pack |
+| 8 | Approval-gated plan (job) | On the job listing: **Yes, pursue this opportunity** → **Make a plan** → **Approve and run** | The "Check your CV is on file" step fails with "You haven't added your CV yet". Use **Add your CV (needed for job plans)** with the fictional `tests/fixtures/cv-sample.pdf`, then **Retry this step**: the requirement comparison waits for your review, then the resume, cover letter and checklist drafts. The last step, applying on the employer's site, is yours | Deterministic CV parsing, matching and drafts |
+| 9 | Reminder state | On any memory: **Remind me about this** → pick a time a minute from now → **Set reminder**. When it is due, run `npm run demo:tick` in a second terminal | Home shows "Reminder is due"; the Inbox (tray icon) has the notification; the reminder shows "In Acorn: sent …"; Done, snooze and dismiss each update it | Deterministic worker; in-app only, no email |
+| 10 | Visual aid | On a read memory: **Create visual aid** | An SVG diagram drawn by Acorn from that memory's statements, labelled as not a Muse Image result and not evidence | Deterministic demo stand-in |
+| 11 | Model usage | Footer → **Meta model usage** (`/usage`) | Zero Meta calls in a fresh clone; demo stand-ins are listed and labelled, never counted as Meta | Stored records |
+
+Reset at any time with `Ctrl+C` and `rm -rf .demo-data`.
+
+## Testing and quality
+
+| Command | What it runs | Result on 5 Nov 2026 (fresh clone, macOS, Node 23.10.0) |
+|---|---|---|
+| `npm test` | Vitest: 62 files of unit, integration, API, UI (jsdom) and evaluation tests. No network and no credentials; Supabase schema, RLS and store code run against an in-process Postgres (PGlite) | **Passed**: 804 passed, 8 skipped. The 8 skipped are `tests/demo-journey.test.ts`, which needs the saved replay file that is not in the public repository (in the developer's copy, with the file: 812 passed) |
+| `npm run typecheck` | `next typegen` and `tsc --noEmit` | **Passed** |
+| `npm run lint` | ESLint with `eslint-config-next` | **Passed** (no problems) |
+| `npm run build` | Next.js production build | **Passed** |
+| `npm run check` | lint, typecheck, test and build in one go | Each part passed separately as above |
+| `npm run eval` / `npm run eval:agent` | The labelled evaluation sets in `evals/` through the real pipeline in demo mode (also part of `npm test`) | Passed as part of `npm test`. They measure the demo heuristics on cases written alongside them: regression floors, not accuracy claims, and not a measure of any Meta model |
+| `npm run meta:live:dryrun` | The four gated live-check harnesses against a stubbed API with a fake key | **Passed** (4 tests, no network) |
+| `npm run audit:secrets` | Read-only scan: committable files, `.env.local` values, the browser bundle, server-only use of secret variables | **No secret exposure found** |
+
+Known flaky or environment-dependent tests:
+
+- **Cold first run.** On the very first `npm test` after `npm ci`, five tests hit Vitest's default 5-second timeout (`agent-cloud`, `agent45`, `meta-multimodal`, `pwa-ios`, `study-ui`) while the transform cache was cold. The same five passed alone and in a second full run. If you see this, run `npm test` again.
+- **Real PostgreSQL tests.** `tests/pgvector.integration.test.ts` and `tests/pending-migrations.integration.test.ts` need a local PostgreSQL with the pgvector extension (or `PGBIN`); without it they are skipped with a visible message. They ran on the test machine because one was installed.
+- **Live checks** (`npm run meta:check`, `npm run meta:live:*`) are paid, manual and never part of `npm test`.
+
+## Known limitations
+
+- **Real devices.** Nothing has been verified on a real phone: the Android share target, the iOS Shortcut, installing the PWA and recording on a phone are tested in code only. iOS share-sheet support is not claimed.
+- **Live Meta and Supabase together.** A full live flow (real Meta models with Supabase cloud storage, end to end) has **not** been verified. Supabase schema, RLS and store code are tested against an in-process Postgres, not a hosted project; the newest migration (`20261105000000_meta_artifacts.sql`) has not been applied to any database.
+- **Live Meta coverage.** Muse Spark extraction (text, image, PDF), Muse Voice Transcribe and Muse Image were each verified live once, the last two outside the app flow. Intent, answers, suggested steps and region reading through Muse Spark were never run live. SAM 3.1 returned zero regions in both live tests, and masks are not decoded.
+- **Semantic retrieval in the demo.** The demo has no embedding provider, so search is keyword-only: synonyms and paraphrases are not matched. The embeddings client has only been tested against a stubbed `fetch`, and the hybrid ranking weights are uncalibrated.
+- **Demo reader.** In demo mode only the built-in sample images and PDF are actually read; any other image or PDF gets a minimal, labelled reading. Demo voice does not transcribe.
+- **Reminder email.** Email delivery (Resend) has never been verified with a real send; the in-app inbox is what was tested. Locally, reminders are delivered only when `npm run demo:tick` (or another caller of `/api/cron/tick`) runs.
+- **Processing model.** Reading runs inside the server after the response, with no job queue; image generation can take a minute or more. The model call budget is per process and resets on restart. The local store is a single JSON file for one process.
+- **Inputs.** HEIC photos are not readable; CVs need a text layer (no OCR); Muse Spark returned no PDF page numbers, so none are shown.
+- **Stale labels in the UI.** The "About the models" panel on the Capture page still marks voice transcription as "planned" and image generation and segmentation as "not integrated", and `/api/health` reports `usedByAcorn: false` for them. The code paths described above exist; those labels predate them.
+- **Dev-mode warning.** In `npm run dev` / `npm run demo` the Next.js overlay reports a hydration-mismatch warning on the Home page greeting. The page renders and works.
+- **Generated content.** A visual aid can add small things the memory did not say (seen once live), so it is labelled and kept apart from evidence.
+- **Platforms.** Windows is untested (use WSL). Node 23 works with install warnings; Node 22 LTS or 24 is recommended.
+
+## Privacy and security
+
+- **Where data lives.** Local mode: one JSON file plus an `uploads/` folder in `.data/` (or `.demo-data/` for the demo) on your machine, both gitignored. Cloud mode: Supabase Postgres and a private Storage bucket; files are stored under `<user id>/<random name>` and shown through a 5-minute signed URL created only for the signed-in owner.
+- **Authentication and isolation.** Local mode has no accounts and is meant for one person on their own machine. In cloud mode every user-owned table has Row-Level Security for `auth.uid()`; the server queries as the signed-in user, so Postgres refuses anything that isn't theirs, and composite foreign keys stop an action or link pointing at another user's memory. Tested in `tests/rls.test.ts`, `tests/cloud.test.ts` and `tests/agent-cloud.test.ts`; manual procedure in [docs/two-user-isolation-test.md](docs/two-user-isolation-test.md). The service-role key is read only by the scheduled notification worker, never while serving a request.
+- **Originals are preserved.** The note, link, image, PDF or recording is stored first, exactly as saved, and is never replaced by a summary; your corrections are stored separately and always win.
+- **Uploads.** Identified by their bytes (not the file name), size-limited, stored under random names outside `public/`, and served with `X-Content-Type-Options: nosniff`.
+- **API keys.** Read only by server-only modules, never `NEXT_PUBLIC_`; error messages never include the key or the API's own text; model logs contain model, status, latency and token counts, never content. `npm run audit:secrets` checks committable files and the browser bundle.
+- **Saved content is untrusted.** It is fenced in delimiters in every prompt, and the model is told never to follow instructions found inside it.
+- **Demo isolation.** `npm run demo` forces local storage in `.demo-data/`, the mock provider, a call budget of 0, no key, no embeddings and no email, whatever `.env.local` says.
+- **Nothing goes out unless you configure it.** No tool submits, sends, pays or contacts anyone. Email needs four separate settings. Links are fetched only in Meta mode, through an SSRF guard. `/api/cron/tick` does not exist unless `CRON_SECRET` (32 characters or more) is set.
+
+## Future scope
+
+Planned or possible next steps. **None of these is implemented.**
+
+- A native iOS Share Extension, since iOS web apps can't be share targets.
+- More intelligent semantic retrieval: a verified embedding provider, calibrated hybrid ranking and evaluation on held-out data.
+- Deeper proactive memory connections, beyond shared entities, topics and sites.
+- Expanded follow-through integrations (for example calendars), still behind explicit approval.
+- A background job queue for processing and image generation instead of running after the response.
+- Live verification of the remaining paths: region reading, SAM on photos of real objects, email delivery, and a full Meta-plus-Supabase run on real devices.
