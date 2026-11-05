@@ -1,0 +1,43 @@
+%PDF-1.4
+1 0 obj
+<</Type/Catalog/Pages 2 0 R>>
+endobj
+2 0 obj
+<</Type/Pages/Kids[3 0 R 5 0 R]/Count 2>>
+endobj
+3 0 obj
+<</Type/Page/Parent 2 0 R/MediaBox[0 0 612 792]/Contents 4 0 R/Resources<</Font<</F1 7 0 R>>>>>>
+endobj
+4 0 obj
+<</Length 321>>
+stream
+BT /F1 12 Tf 50 740 Td 16 TL (Sparse Routing for Long-Context Retrieval) Tj T* (A. Verma and L. Okafor) Tj T* (Abstract: We study retrieval over documents longer than 100 pages.) Tj T* (Our sparse routing method improves recall by 12 percent over a dense baseline.) Tj T* (We release code and an evaluation set.) Tj T* ET
+endstream
+endobj
+5 0 obj
+<</Type/Page/Parent 2 0 R/MediaBox[0 0 612 792]/Contents 6 0 R/Resources<</Font<</F1 7 0 R>>>>>>
+endobj
+6 0 obj
+<</Length 297>>
+stream
+BT /F1 12 Tf 50 740 Td 16 TL (Results) Tj T* (On the long-document set, recall at 10 rose from 61 percent to 73 percent.) Tj T* (Latency increased by 8 percent.) Tj T* (Conclusion: sparse routing is a practical way to read long documents.) Tj T* (Code: https://example.org/sparse-routing) Tj T* ET
+endstream
+endobj
+7 0 obj
+<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>
+endobj
+xref
+0 8
+0000000000 65535 f 
+0000000009 00000 n 
+0000000054 00000 n 
+0000000111 00000 n 
+0000000223 00000 n 
+0000000593 00000 n 
+0000000705 00000 n 
+0000001051 00000 n 
+trailer
+<</Size 8/Root 1 0 R>>
+startxref
+1114
+%%EOF

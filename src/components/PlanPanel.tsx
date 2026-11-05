@@ -1,10 +1,13 @@
 import Link from "next/link";
 import { intentSuggestion } from "@/lib/agent/intents";
-import { PERMISSION_LABEL, planProgress, WORKFLOW_LABEL, type Plan, type PlanStatus, type PlanStep, type StepState } from "@/lib/agent/schema";
+import { PERMISSION_LABEL, planProgress, workflowLabel, type Plan, type PlanStatus, type PlanStep, type StepState } from "@/lib/agent/schema";
 import { formatQuantity } from "@/lib/agent/recipe";
+import type { StudyPack } from "@/lib/agent/study";
 import type { Action, Memory } from "@/lib/schema";
 import { type CvInfo, CvEditor, MakePlanButton, PlanDecision, RecordStep, RejectPlan, RetryStep, ReminderStepControls, ReviewControls } from "./AgentControls";
 import { formatDateTime } from "./format";
+import { Aiko, type Mood } from "./Aiko";
+import { StudyPackView } from "./StudyPack";
 import { SectionHeading, Tag } from "./ui";
 
 const PLAN_TONE: Record<PlanStatus, "plain" | "moss" | "amber" | "danger"> = {
@@ -39,9 +42,9 @@ export function PlanPanel({ memory, plans, actions, cv }: { memory: Memory; plan
       <SectionHeading id="agent-heading">Let Acorn help you act on it</SectionHeading>
 
       {s && (
-        <div className="rounded-2xl border border-line/80 bg-card p-4 shadow-card sm:p-5">
+        <div className="rounded-3xl border-2 border-line/80 bg-card p-4 shadow-card sm:p-5">
           <div className="flex flex-wrap items-center gap-2">
-            <h3 className="font-display text-lg font-medium">{s.label}</h3>
+            <h3 className="font-display text-lg">{s.label}</h3>
             {s.isSuggestion ? <Tag tone="amber">Acorn&apos;s suggestion, not confirmed</Tag> : <Tag tone="moss">Your intent</Tag>}
             {s.confidence !== null && <span className="text-sm text-ink-faint">{Math.round(s.confidence * 100)}% sure</span>}
           </div>
@@ -62,7 +65,7 @@ export function PlanPanel({ memory, plans, actions, cv }: { memory: Memory; plan
           )}
           {s.nextSteps.length > 0 && <p className="mt-2 text-sm text-ink-soft">Possible next steps: {s.nextSteps.join(" · ")}</p>}
           {s.isSuggestion && <p className="mt-3 text-sm text-ink-soft">Confirm why you saved this (above) and Acorn can make a plan. Until then it only has a guess.</p>}
-          {!s.isSuggestion && s.workflow && !open && <div className="mt-4"><MakePlanButton memoryId={memory.id} label={plans.length ? `Start a new plan: ${WORKFLOW_LABEL[s.workflow]}` : `Make a plan: ${WORKFLOW_LABEL[s.workflow]}`} /></div>}
+          {!s.isSuggestion && s.workflow && !open && <div className="mt-4"><MakePlanButton memoryId={memory.id} label={plans.length ? `Start a new plan: ${workflowLabel(s.workflow, s.kind)}` : `Make a plan: ${workflowLabel(s.workflow, s.kind)}`} /></div>}
         </div>
       )}
 
@@ -78,18 +81,26 @@ export function PlanPanel({ memory, plans, actions, cv }: { memory: Memory; plan
   );
 }
 
+function planMood(plan: Plan): Mood {
+  if (plan.status === "completed") return "celebrating";
+  if (plan.status === "failed") return "confused";
+  if (plan.status === "awaiting_approval") return "curious";
+  return plan.intentKind === "learn" ? "learning" : "encouraging";
+}
+
 function PlanCard({ plan, action }: { plan: Plan; action: Action | undefined }) {
   const progress = planProgress(plan);
   const decided = plan.status !== "awaiting_approval";
   return (
-    <article className="rounded-2xl border border-line/80 bg-card p-4 shadow-card sm:p-5" aria-label={plan.goal}>
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div>
-          <p className="text-xs tracking-wide text-ink-faint uppercase">{WORKFLOW_LABEL[plan.workflow]}</p>
-          <h3 className="font-display text-lg leading-snug font-medium">{plan.goal}</h3>
+    <article className="rounded-3xl border-2 border-line/80 bg-card p-4 shadow-card sm:p-5" aria-label={plan.goal}>
+      <div className="flex items-center gap-3">
+        <Aiko mood={planMood(plan)} size={64} className="shrink-0" />
+        <div className="flex min-w-0 flex-1 flex-wrap items-center justify-between gap-2">
+          <p className="text-xs font-bold tracking-wide text-ink-faint uppercase">{workflowLabel(plan.workflow, plan.intentKind)}</p>
+          <Tag tone={PLAN_TONE[plan.status]}>{PLAN_LABEL[plan.status]}</Tag>
         </div>
-        <Tag tone={PLAN_TONE[plan.status]}>{PLAN_LABEL[plan.status]}</Tag>
       </div>
+      <h3 className="mt-2 font-display text-lg leading-snug">{plan.goal}</h3>
 
       {decided && plan.status !== "rejected" && (
         <div className="mt-3" aria-label={`Progress: ${progress.done} of ${progress.total} steps`}>
@@ -103,7 +114,7 @@ function PlanCard({ plan, action }: { plan: Plan; action: Action | undefined }) 
       )}
 
       {plan.status === "awaiting_approval" && (
-        <div className="mt-4 rounded-xl bg-amber-soft/50 p-3 text-sm">
+        <div className="mt-4 rounded-2xl bg-butter-soft p-3 text-sm">
           <p className="font-medium">Nothing has run. If you approve, Acorn may:</p>
           <ul className="mt-1 list-disc pl-5 text-ink-soft">
             {plan.permissionsRequested.map((p) => (
@@ -170,7 +181,7 @@ function StepRow({ plan, step, index }: { plan: Plan; step: PlanStep; index: num
         </p>
       )}
 
-      {output && step.tool && <StepOutput tool={step.tool} output={output} edited={step.edited} />}
+      {output && step.tool && <StepOutput tool={step.tool} output={output} edited={step.edited} planId={plan.id} stepId={step.id} canMark={live && ["awaiting_review", "succeeded"].includes(step.state)} />}
 
       {step.result && (
         <details className="mt-2 text-sm">
@@ -207,7 +218,7 @@ const MATCH_LABEL: Record<string, string> = { VERIFIED_MATCH: "Verified", POTENT
 type Rec = Record<string, unknown>;
 const arr = (v: unknown): Rec[] => (Array.isArray(v) ? (v as Rec[]) : []);
 
-function StepOutput({ tool, output, edited }: { tool: string; output: Rec; edited: boolean }) {
+function StepOutput({ tool, output, edited, planId, stepId, canMark }: { tool: string; output: Rec; edited: boolean; planId: string; stepId: string; canMark: boolean }) {
   const note = edited ? <p className="mt-1 text-xs text-amber">Edited by you. Acorn can&apos;t vouch for your changes.</p> : null;
   switch (tool) {
     case "retrieve_memory":
@@ -325,6 +336,8 @@ function StepOutput({ tool, output, edited }: { tool: string; output: Rec; edite
           {note}
         </div>
       );
+    case "build_study_pack":
+      return <StudyPackView pack={output as unknown as StudyPack} planId={planId} stepId={stepId} canMark={canMark} />;
     case "extract_recipe": {
       const steps = arr(output.instructions);
       const sv = output.servings as { value: number } | null;
