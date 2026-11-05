@@ -1,0 +1,548 @@
+{
+ "description": "Hand-labelled cases for the phase 4.5 agent: requirement matching against CVs, recipe reading and follow-up intent detection. Fictional people and content. The rules were written alongside many of these cases, so this is NOT a held-out test: it measures the rules on this set and says nothing about unseen CVs. The point of the set is the error TYPES: a requirement must never come out VERIFIED_MATCH unless the CV really says it (false verified = 0).",
+ "today": "2026-11-01",
+ "cvs": {
+  "dated": "Asha Rao\nasha.rao@example.com | +91 98765 43210\n\nSummary\nFrontend engineer focused on growth experiments.\n\nExperience\nSenior Frontend Engineer, Brightly Labs\nJan 2021 - Present\n- Built React and TypeScript apps in production for the growth team\n- Ran A/B tests on the signup funnel and reported funnel metrics weekly\n\nFrontend Engineer, Kiln Studio\nJun 2018 - Dec 2020\n- Led a Next.js migration with server rendering and web performance budgets\n\nSkills\nReact, TypeScript, Next.js, Node.js, SQL, A/B testing\n\nEducation\nB.Tech Computer Science, NIT Trichy, 2014 - 2018\n\nCertifications\nAWS Certified Cloud Practitioner, 2022",
+  "undated": "Ravi Kumar\n\nExperience\nBackend Developer, Orbit Pay\n- Built payment APIs in Python and PostgreSQL\n- Wrote Kubernetes manifests for deployments\n\nSkills\nPython, PostgreSQL, Docker, Kubernetes",
+  "contradictory": "Meera Das\n\nExperience\nEngineer, Acme\nJan 2022 - Mar 2021\n- Built React dashboards\n\nEngineer, Beta\nJun 2019 - Dec 2022\n- Built Vue storefronts\n\nEngineer, Gamma\nMay 2021 - Present\n- Maintained Go services",
+  "yearOnly": "Sam Ortiz\n\nExperience\nData Engineer, Northwind\n2019 - 2021\n- Built Airflow pipelines in Python\n\nSkills\nPython, Airflow, SQL",
+  "unstructured": "Tara Menon\nI have built React apps for six years and enjoy mentoring junior developers. I also ran several A/B experiments on checkout."
+ },
+ "requirements": [
+  {
+   "id": "react-plain",
+   "cv": "dated",
+   "text": "React experience",
+   "expect": "VERIFIED_MATCH",
+   "why": "skill listed and used"
+  },
+  {
+   "id": "react-js",
+   "cv": "dated",
+   "text": "Experience with React.js",
+   "expect": "VERIFIED_MATCH",
+   "why": "alias spelling of React"
+  },
+  {
+   "id": "react-reactjs",
+   "cv": "dated",
+   "text": "Proficiency in ReactJS",
+   "expect": "VERIFIED_MATCH",
+   "why": "alias spelling"
+  },
+  {
+   "id": "ts-full",
+   "cv": "dated",
+   "text": "Strong TypeScript skills",
+   "expect": "VERIFIED_MATCH",
+   "why": "listed and used"
+  },
+  {
+   "id": "react-ts-apps",
+   "cv": "dated",
+   "text": "Building production React and TypeScript apps",
+   "expect": "VERIFIED_MATCH",
+   "why": "one bullet covers all terms"
+  },
+  {
+   "id": "ab-tests",
+   "cv": "dated",
+   "text": "Experience with A/B tests",
+   "expect": "VERIFIED_MATCH",
+   "why": "A/B tests in a role and in skills"
+  },
+  {
+   "id": "ab-split",
+   "cv": "dated",
+   "text": "Familiarity with split testing",
+   "expect": "VERIFIED_MATCH",
+   "why": "split testing is a documented equivalent of A/B testing"
+  },
+  {
+   "id": "ab-experimentation",
+   "cv": "dated",
+   "text": "Experimentation and funnel analysis",
+   "expect": "POTENTIAL_MATCH",
+   "why": "related wording only: experiments are not named"
+  },
+  {
+   "id": "nextjs-spelling",
+   "cv": "dated",
+   "text": "Next.js (or NextJS) experience",
+   "expect": "VERIFIED_MATCH",
+   "why": "alias spelling"
+  },
+  {
+   "id": "ssr",
+   "cv": "dated",
+   "text": "Server-side rendering experience",
+   "expect": "VERIFIED_MATCH",
+   "why": "server rendering in a bullet"
+  },
+  {
+   "id": "sql-databases",
+   "cv": "dated",
+   "text": "Experience with SQL databases",
+   "expect": "POTENTIAL_MATCH",
+   "why": "SQL is listed but 'databases' is not claimed"
+  },
+  {
+   "id": "node",
+   "cv": "dated",
+   "text": "Node.js backend experience",
+   "expect": "POTENTIAL_MATCH",
+   "why": "Node.js is a skill but no backend work is shown"
+  },
+  {
+   "id": "kubernetes-missing",
+   "cv": "dated",
+   "text": "Experience with Kubernetes",
+   "expect": "MISSING",
+   "why": "not in the CV"
+  },
+  {
+   "id": "graphql-missing",
+   "cv": "dated",
+   "text": "GraphQL API design",
+   "expect": "MISSING",
+   "why": "not in the CV"
+  },
+  {
+   "id": "angular-vs-react",
+   "cv": "dated",
+   "text": "Angular experience",
+   "expect": "MISSING",
+   "why": "React is not Angular"
+  },
+  {
+   "id": "java-vs-javascript",
+   "cv": "dated",
+   "text": "Java development experience",
+   "expect": "MISSING",
+   "why": "Java is not JavaScript"
+  },
+  {
+   "id": "go-language",
+   "cv": "dated",
+   "text": "Experience with Go",
+   "expect": "MISSING",
+   "why": "no Go anywhere"
+  },
+  {
+   "id": "nosql-vs-sql",
+   "cv": "dated",
+   "text": "NoSQL experience",
+   "expect": "MISSING",
+   "why": "SQL is not NoSQL"
+  },
+  {
+   "id": "python-missing",
+   "cv": "dated",
+   "text": "Python scripting",
+   "expect": "MISSING",
+   "why": "not in this CV"
+  },
+  {
+   "id": "years-react-met",
+   "cv": "dated",
+   "text": "3+ years of React",
+   "expect": "VERIFIED_MATCH",
+   "why": "role dated Jan 2021 to now covers more than 3 years"
+  },
+  {
+   "id": "years-react-long",
+   "cv": "dated",
+   "text": "8+ years of React",
+   "expect": "POTENTIAL_MATCH",
+   "why": "the dated role is shorter than 8 years: never verified"
+  },
+  {
+   "id": "years-no-dates",
+   "cv": "undated",
+   "text": "3+ years of Python",
+   "expect": "UNVERIFIED",
+   "why": "Python is there but the CV has no dates"
+  },
+  {
+   "id": "years-year-only-ok",
+   "cv": "yearOnly",
+   "text": "1+ years of Airflow",
+   "expect": "VERIFIED_MATCH",
+   "why": "2019-2021 is at least 14 months even at year precision"
+  },
+  {
+   "id": "years-year-only-borderline",
+   "cv": "yearOnly",
+   "text": "2+ years of Airflow",
+   "expect": "POTENTIAL_MATCH",
+   "why": "year-only dates could be 14 to 36 months"
+  },
+  {
+   "id": "years-unstructured",
+   "cv": "unstructured",
+   "text": "5+ years of React",
+   "expect": "UNVERIFIED",
+   "why": "the CV says six years but gives no dates: stated, not verifiable"
+  },
+  {
+   "id": "conflict-end-before-start",
+   "cv": "contradictory",
+   "text": "2+ years of React",
+   "expect": "POTENTIAL_MATCH",
+   "why": "the React role's dates contradict themselves"
+  },
+  {
+   "id": "conflict-fine-role",
+   "cv": "contradictory",
+   "text": "Go services",
+   "expect": "VERIFIED_MATCH",
+   "why": "a role with sound dates and a plain skill claim"
+  },
+  {
+   "id": "eligibility",
+   "cv": "dated",
+   "text": "Authorized to work in India",
+   "expect": "UNVERIFIED",
+   "why": "a CV cannot prove eligibility"
+  },
+  {
+   "id": "communication",
+   "cv": "dated",
+   "text": "Strong communication skills",
+   "expect": "UNVERIFIED",
+   "why": "a CV cannot prove soft skills"
+  },
+  {
+   "id": "relocate",
+   "cv": "dated",
+   "text": "Willing to relocate",
+   "expect": "UNVERIFIED",
+   "why": "a preference, not evidence"
+  },
+  {
+   "id": "degree",
+   "cv": "dated",
+   "text": "Bachelor's degree in Computer Science",
+   "expect": "POTENTIAL_MATCH",
+   "why": "the CV has a B.Tech in Computer Science: probably, but ask"
+  },
+  {
+   "id": "aws-cert",
+   "cv": "dated",
+   "text": "AWS certification",
+   "expect": "POTENTIAL_MATCH",
+   "why": "an AWS certificate exists but the wording differs: ask"
+  },
+  {
+   "id": "led-team",
+   "cv": "dated",
+   "text": "Led a team of engineers",
+   "expect": "POTENTIAL_MATCH",
+   "why": "'led' and 'engineer' are in different places: not evidence of leading a team"
+  },
+  {
+   "id": "metrics-claim",
+   "cv": "dated",
+   "text": "Reduced page load time by 40%",
+   "expect": "MISSING",
+   "why": "no such achievement in the CV"
+  },
+  {
+   "id": "mentoring",
+   "cv": "unstructured",
+   "text": "Mentoring junior developers",
+   "expect": "VERIFIED_MATCH",
+   "why": "stated in an unstructured CV"
+  },
+  {
+   "id": "unstructured-react",
+   "cv": "unstructured",
+   "text": "React experience",
+   "expect": "VERIFIED_MATCH",
+   "why": "stated in the CV text"
+  },
+  {
+   "id": "analytics",
+   "cv": "dated",
+   "text": "Product analytics background",
+   "expect": "POTENTIAL_MATCH",
+   "why": "funnel metrics are related but not the same"
+  },
+  {
+   "id": "kafka-undated",
+   "cv": "undated",
+   "text": "Kafka experience",
+   "expect": "MISSING",
+   "why": "absent"
+  },
+  {
+   "id": "docker-skill",
+   "cv": "undated",
+   "text": "Docker experience",
+   "expect": "VERIFIED_MATCH",
+   "why": "listed in skills"
+  },
+  {
+   "id": "empty-requirement",
+   "cv": "dated",
+   "text": "Nice to have",
+   "expect": "UNVERIFIED",
+   "why": "nothing specific to look for"
+  },
+  {
+   "id": "react-native",
+   "cv": "dated",
+   "text": "React Native experience",
+   "expect": "POTENTIAL_MATCH",
+   "why": "React is there, native mobile work is not"
+  },
+  {
+   "id": "react-or-vue",
+   "cv": "dated",
+   "text": "React or Vue",
+   "expect": "POTENTIAL_MATCH",
+   "why": "only one side of the alternative is there; Acorn asks rather than guessing the OR"
+  },
+  {
+   "id": "ts-and-k8s",
+   "cv": "undated",
+   "text": "TypeScript and Kubernetes",
+   "expect": "POTENTIAL_MATCH",
+   "why": "Kubernetes is listed but TypeScript is not"
+  },
+  {
+   "id": "python-and-k8s",
+   "cv": "undated",
+   "text": "Python and Kubernetes experience",
+   "expect": "VERIFIED_MATCH",
+   "why": "both are listed together on one skills line"
+  }
+ ],
+ "recipes": [
+  {
+   "id": "complete",
+   "title": "Creamy lemon garlic pasta",
+   "text": "Creamy lemon garlic pasta (serves 4)\nIngredients: 200g spaghetti, 4 cloves garlic, 1 lemon (zest + juice), 2 tbsp butter, 1/2 cup parmesan, chilli flakes, parsley.\nMethod: Cook the pasta. Sizzle garlic in butter. Toss with parmesan.",
+   "entities": [],
+   "expect": {
+    "servings": 4,
+    "ingredients": [
+     [
+      "spaghetti",
+      200,
+      "g"
+     ],
+     [
+      "garlic",
+      4,
+      "clove"
+     ],
+     [
+      "lemon",
+      1,
+      null
+     ],
+     [
+      "butter",
+      2,
+      "tbsp"
+     ],
+     [
+      "parmesan",
+      0.5,
+      "cup"
+     ],
+     [
+      "chilli flakes",
+      null,
+      null
+     ],
+     [
+      "parsley",
+      null,
+      null
+     ]
+    ],
+    "steps": 3,
+    "warnings": 0
+   }
+  },
+  {
+   "id": "cropped-screenshot",
+   "title": "Masala oats",
+   "text": "Mom's masala oats\n1 cup rolled oats, 1 onion, 1 tomato, handful of peas, 1 green chilli",
+   "entities": [],
+   "expect": {
+    "servings": null,
+    "ingredients": [
+     [
+      "rolled oats",
+      1,
+      "cup"
+     ],
+     [
+      "onion",
+      1,
+      null
+     ],
+     [
+      "tomato",
+      1,
+      null
+     ],
+     [
+      "handful of peas",
+      null,
+      null
+     ],
+     [
+      "green chilli",
+      1,
+      null
+     ]
+    ],
+    "steps": 0,
+    "warningContains": "No method"
+   }
+  },
+  {
+   "id": "entities-only",
+   "title": "Mystery salad",
+   "text": "Loved this one at the cafe",
+   "entities": [
+    {
+     "name": "avocado",
+     "kind": "ingredient"
+    },
+    {
+     "name": "feta",
+     "kind": "ingredient"
+    }
+   ],
+   "expect": {
+    "servings": null,
+    "ingredients": [
+     [
+      "avocado",
+      null,
+      null
+     ],
+     [
+      "feta",
+      null,
+      null
+     ]
+    ],
+    "steps": 0,
+    "warningContains": "No ingredient list"
+   }
+  },
+  {
+   "id": "ranges-and-fractions",
+   "title": "Dal",
+   "text": "Dal tadka serves 6\nIngredients:\n- 1 1/2 cups toor dal\n- 2-3 tbsp ghee\n- ½ tsp turmeric\n- 1 (400 g) can tomatoes, chopped\n- salt to taste\nMethod:\n1. Boil the dal.\n2. Make the tadka.",
+   "entities": [],
+   "expect": {
+    "servings": 6,
+    "ingredients": [
+     [
+      "toor dal",
+      1.5,
+      "cup"
+     ],
+     [
+      "ghee",
+      2,
+      "tbsp"
+     ],
+     [
+      "turmeric",
+      0.5,
+      "tsp"
+     ],
+     [
+      "tomatoes",
+      1,
+      "can"
+     ],
+     [
+      "salt",
+      null,
+      null
+     ]
+    ],
+    "steps": 2,
+    "warnings": 0
+   }
+  },
+  {
+   "id": "duplicates-merge",
+   "title": "Veg curry",
+   "text": "Veg curry\nIngredients: 2 cloves garlic, 1 onion, 2 tomatoes, 1 tomato, 1 clove garlic, minced\nMethod: Cook everything.",
+   "entities": [],
+   "expect": {
+    "servings": null,
+    "mergedList": [
+     [
+      "garlic",
+      3,
+      "clove"
+     ],
+     [
+      "onion",
+      1,
+      null
+     ],
+     [
+      "tomatoes",
+      3,
+      null
+     ]
+    ],
+    "steps": 1
+   }
+  }
+ ],
+ "followups": [
+  {
+   "id": "recruiter",
+   "note": "Need to follow up with the recruiter after the interview next Friday",
+   "expect": "follow_up"
+  },
+  {
+   "id": "application-week",
+   "note": "Revisit my application at Lumen after a week",
+   "expect": "follow_up"
+  },
+  {
+   "id": "event-checkback",
+   "note": "Check back with the organisers about the meetup",
+   "expect": "follow_up"
+  },
+  {
+   "id": "hear-back",
+   "note": "Waiting to hear back from the hiring manager",
+   "expect": "follow_up"
+  },
+  {
+   "id": "noun-use",
+   "note": "The follow-up questions in the survey were great",
+   "expect": null
+  },
+  {
+   "id": "no-followup",
+   "note": "The meeting room is on the third floor",
+   "expect": null
+  },
+  {
+   "id": "catch-up",
+   "note": "Catch up with Priya over coffee",
+   "expect": "reconnect"
+  },
+  {
+   "id": "negated",
+   "note": "No follow up needed, it is all done",
+   "expect": null
+  }
+ ]
+}

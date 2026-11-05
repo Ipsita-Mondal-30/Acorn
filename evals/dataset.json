@@ -1,0 +1,44 @@
+{
+  "description": "Small hand-labelled set for the DEMO (mock) reader and for regression-testing the pipeline. Fictional content. Today's date for relative dates is 2026-10-31. The mock heuristics were developed alongside several of these inputs (the built-in samples), so this is NOT a held-out test and will flatter the mock. The numbers it produces measure the mock heuristics on THIS set; they say nothing about Meta models. Re-run it against Meta mode (same cases) once credits exist.",
+  "today": "2026-10-31",
+  "cases": [
+    { "id": "job-listing", "sample": "job-listing", "expect": { "contentType": "job", "entities": ["Northwind Labs"], "deadline": "2027-01-15", "intent": "pursue" } },
+    { "id": "recipe-reel", "sample": "recipe-reel", "expect": { "contentType": "recipe", "entities": ["spaghetti", "garlic", "parmesan", "olive oil"], "deadline": null, "intent": "try" } },
+    { "id": "db-slide", "sample": "db-slide", "expect": { "contentType": "technical", "entities": ["postgres", "b-tree", "gin"], "deadline": null, "intent": "learn" } },
+    { "id": "event-post", "sample": "event-post", "expect": { "contentType": "event", "entities": ["Rohan Mehta", "Indiranagar Social Hub"], "deadline": "2026-11-10", "intent": "attend" } },
+    { "id": "product-idea", "sample": "product-idea", "expect": { "contentType": "idea", "entities": [], "deadline": null, "intent": "explore" } },
+    { "id": "paper-pdf", "sample": "paper-pdf", "expect": { "contentType": "article", "entities": [], "deadline": null, "intent": "reference" } },
+    { "id": "instagram-link", "sample": "instagram-link", "expect": { "contentType": "recipe", "entities": [], "deadline": null, "intent": "try", "limitation": "Instagram" } },
+    { "id": "note-job", "note": "Lumen is hiring a Frontend Engineer. Location: Remote. Apply by Nov 12.\nRequirements:\n- 3+ years React", "expect": { "contentType": "job", "entities": ["Lumen"], "deadline": "2026-11-12", "intent": "pursue" } },
+    { "id": "note-recipe", "note": "Ingredients: 2 cups flour, 1 tbsp butter. Bake 20 minutes.", "expect": { "contentType": "recipe", "entities": [], "deadline": null, "intent": "try" } },
+    { "id": "note-person", "note": "Reconnect with Sam Lee next Friday", "expect": { "contentType": "person", "entities": ["Sam Lee"], "deadline": null, "intent": "reconnect" } },
+    { "id": "note-redis", "note": "Redis cache stampede: use request coalescing and a short TTL jitter. Read up on Redis eviction.", "expect": { "contentType": "technical", "entities": ["redis"], "deadline": null, "intent": "learn" } },
+    { "id": "note-event", "note": "Rust Bangalore meetup this Saturday 6 PM at Cubbon Park Hall. RSVP by Friday.", "expect": { "contentType": "event", "entities": [], "deadline": "2026-11-06", "intent": "attend" } },
+    { "id": "note-product", "note": "Add to cart: Sony WH-1000XM6 headphones, free shipping, 15% off this week. I want to buy these.", "expect": { "contentType": "product", "entities": [], "deadline": null, "intent": "buy" } },
+    { "id": "note-idea", "note": "What if we built a browser extension that groups saved recipes by aisle? Side project idea.", "expect": { "contentType": "idea", "entities": [], "deadline": null, "intent": "explore" } },
+    { "id": "note-deadline", "note": "Passport renewal deadline 2026-12-01", "expect": { "contentType": "deadline", "entities": [], "deadline": "2026-12-01", "intent": "do_later" } },
+    { "id": "note-ambiguous", "note": "blue", "expect": { "contentType": "note", "entities": [], "deadline": null, "intent": null } },
+    { "id": "url-only", "url": "https://example.com/blog/postgres-indexing-guide", "expect": { "contentType": "technical", "entities": ["postgres"], "deadline": null, "intent": "learn" } },
+    { "id": "image-ambiguous", "imageBase64": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg==", "fileName": "IMG_4021.png", "expect": { "contentType": "other", "entities": [], "deadline": null, "intent": null, "maxConfidence": 0.15 } }
+  ],
+  "retrieval": [
+    { "query": "Northwind data engineer role", "top1": "job-listing" },
+    { "query": "Find the screenshot with the database indexing explanation", "top1": "db-slide" },
+    { "query": "Which post mentioned that startup event?", "top1": "event-post" },
+    { "query": "Find the technical resources I saved about Redis", "top1": "note-redis" },
+    { "query": "research paper about sparse routing", "top1": "paper-pdf" },
+    { "query": "Sam Lee", "top1": "note-person" },
+    { "query": "headphones", "top1": "note-product" },
+    { "query": "passport renewal", "top1": "note-deadline" },
+    { "query": "Find that pasta recipe I saved", "top2": ["recipe-reel", "instagram-link"] },
+    { "query": "Find my notes about Kubernetes", "top1": null },
+    { "query": "What is the capital of France?", "top1": null },
+    { "query": "zebra unicorn xylophone", "top1": null }
+  ],
+  "answers": [
+    { "question": "What were the ingredients in the recipe?", "citesOnly": "recipe-reel", "mustMention": ["spaghetti", "parmesan"] },
+    { "question": "When does the Northwind job listing close?", "citesOnly": "job-listing", "mustMention": ["2027-01-15"] },
+    { "question": "Find the technical resources I saved about Redis", "citesOnly": "note-redis", "mustMention": [] },
+    { "question": "What is the capital of France?", "noReliableMatch": true }
+  ]
+}

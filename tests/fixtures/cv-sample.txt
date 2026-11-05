@@ -1,0 +1,27 @@
+Asha Rao
+asha.rao@example.com | +91 98765 43210 | linkedin.com/in/asharao
+
+Summary
+Frontend engineer focused on growth experiments.
+
+Experience
+Senior Frontend Engineer, Brightly Labs
+Jan 2021 - Present
+- Built React and TypeScript apps in production for the growth team
+- Ran A/B tests on the signup funnel and reported funnel metrics weekly
+
+Frontend Engineer, Kiln Studio
+Jun 2018 - Dec 2020
+- Led a Next.js migration with server rendering and web performance budgets
+
+Projects
+Open-source dashboard kit: React components for analytics dashboards
+
+Skills
+React, TypeScript, Next.js, Node.js, SQL, A/B testing
+
+Education
+B.Tech Computer Science, NIT Trichy, 2014 - 2018
+
+Certifications
+AWS Certified Cloud Practitioner, 2022
