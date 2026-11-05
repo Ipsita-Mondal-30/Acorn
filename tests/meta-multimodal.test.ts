@@ -130,6 +130,20 @@ describe("Muse Voice Transcribe client", () => {
     await expect(tr.transcribeAudio(tone(1))).rejects.toMatchObject({ kind: "bad_request" });
   });
 
+  it("META_MAX_ATTEMPTS=1 never retries: one paid request, one failure", async () => {
+    metaEnv();
+    process.env.META_MAX_ATTEMPTS = "1";
+    try {
+      const f = vi.fn(async () => new Response("{}", { status: 503 }));
+      vi.stubGlobal("fetch", f);
+      const { tr } = await fresh();
+      await expect(tr.transcribeAudio(tone(1))).rejects.toMatchObject({ kind: "unavailable" });
+      expect(f).toHaveBeenCalledTimes(1);
+    } finally {
+      delete process.env.META_MAX_ATTEMPTS;
+    }
+  });
+
   it("is blocked without AI_ENABLE_REAL_CALLS", async () => {
     metaEnv();
     process.env.AI_ENABLE_REAL_CALLS = "false";

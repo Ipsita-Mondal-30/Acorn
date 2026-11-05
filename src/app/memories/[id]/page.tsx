@@ -169,7 +169,8 @@ async function MemoryDetail({ params, searchParams }: Pick<PageProps<"/memories/
           <Understanding memory={memory} view={view} />
           <PlanPanel memory={memory} plans={plans} actions={actions} cv={cv ? cvInfo(cv) : null} />
           {memory.status === "ready" && <VisualAidPanel memoryId={memory.id} aids={aids} ready real={realMeta} />}
-          {memory.source.kind === "image" && memory.source.fileName && (
+          {/* SAM 3.1 returned no regions in two live checks, so "Explore image" is off unless ACORN_ENABLE_EXPLORE_IMAGE=1 */}
+          {process.env.ACORN_ENABLE_EXPLORE_IMAGE === "1" && memory.source.kind === "image" && memory.source.fileName && (
             <ExploreImage memoryId={memory.id} imageUrl={`/api/files/${encodeURIComponent(memory.source.fileName)}`} segmentations={segs} readings={reads} real={realMeta} />
           )}
           <RemindersSection memory={memory} reminders={reminders} actions={actions} deliveries={deliveries} tz={tz} now={now} />

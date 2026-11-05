@@ -28,7 +28,6 @@ export type ChatRequest = {
 
 export type ChatResult = { json: unknown; usage?: Usage; latencyMs: number; attempts: number };
 
-const MAX_ATTEMPTS = 3;
 const MAX_RETRY_WAIT_MS = 10_000;
 const RETRYABLE = new Set([429, 500, 503]);
 
@@ -124,11 +123,11 @@ export async function metaChat(env: Env, key: string, req: ChatRequest): Promise
       log(timedOut ? "timeout" : "network-error", attempt);
       recordCall(undefined, false);
       if (timedOut) throw new AiError(`Meta API timed out after ${Math.round(env.META_TIMEOUT_MS / 1000)}s.`, "timeout");
-      if (attempt >= MAX_ATTEMPTS) throw new AiError("Could not reach the Meta API.", "network");
+      if (attempt >= env.META_MAX_ATTEMPTS) throw new AiError("Could not reach the Meta API.", "network");
       await sleep(retryDelayMs(null, attempt, env.ACORN_RETRY_BASE_MS));
       continue;
     }
-    if (RETRYABLE.has(res.status) && attempt < MAX_ATTEMPTS) {
+    if (RETRYABLE.has(res.status) && attempt < env.META_MAX_ATTEMPTS) {
       void res.body?.cancel().catch(() => {}); // free the connection; nothing in a failed body is used
       log(res.status, attempt);
       await sleep(retryDelayMs(res, attempt, env.ACORN_RETRY_BASE_MS));
@@ -221,11 +220,11 @@ export async function metaRequest(env: Env, key: string, req: RawRequest): Promi
       log(timedOut ? "timeout" : "network-error", attempt);
       recordCall(undefined, false);
       if (timedOut) throw new AiError(`Meta API timed out after ${Math.round(timeoutMs / 1000)}s.`, "timeout");
-      if (attempt >= MAX_ATTEMPTS) throw new AiError("Could not reach the Meta API.", "network");
+      if (attempt >= env.META_MAX_ATTEMPTS) throw new AiError("Could not reach the Meta API.", "network");
       await sleep(retryDelayMs(null, attempt, env.ACORN_RETRY_BASE_MS));
       continue;
     }
-    if (RETRYABLE.has(res.status) && attempt < MAX_ATTEMPTS) {
+    if (RETRYABLE.has(res.status) && attempt < env.META_MAX_ATTEMPTS) {
       void res.body?.cancel().catch(() => {});
       log(res.status, attempt);
       await sleep(retryDelayMs(res, attempt, env.ACORN_RETRY_BASE_MS));
