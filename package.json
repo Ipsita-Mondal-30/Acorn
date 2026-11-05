@@ -14,8 +14,17 @@
     "check": "npm run lint && npm run typecheck && npm test && npm run build",
     "eval": "vitest run tests/eval.test.ts",
     "eval:agent": "vitest run tests/agent-eval.test.ts",
-    "meta:check": "vitest run --config vitest.live.config.mts",
-    "supabase:check": "node scripts/supabase-check.mjs"
+    "meta:check": "vitest run --config vitest.live.config.mts --reporter=default tests/live/spark.live.ts",
+    "supabase:check": "node scripts/supabase-check.mjs",
+    "audit:secrets": "node scripts/audit-secrets.mjs",
+    "meta:check:image": "vitest run --config vitest.live.config.mts --reporter=default tests/live/spark-image.live.ts",
+    "meta:live:voice": "vitest run --config vitest.live.config.mts --reporter=default tests/live/voice.live.ts",
+    "meta:live:image": "vitest run --config vitest.live.config.mts --reporter=default tests/live/image.live.ts",
+    "meta:live:sam": "vitest run --config vitest.live.config.mts --reporter=default tests/live/sam.live.ts",
+    "meta:live:region": "vitest run --config vitest.live.config.mts --reporter=default tests/live/region.live.ts",
+    "meta:live:dryrun": "META_LIVE_DRY_RUN=1 vitest run --config vitest.live.config.mts --reporter=default --no-file-parallelism tests/live/voice.live.ts tests/live/image.live.ts tests/live/sam.live.ts tests/live/region.live.ts",
+    "demo": "node scripts/demo.mjs",
+    "demo:tick": "node scripts/demo.mjs tick"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",
@@ -29,11 +38,14 @@
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.13",
     "@tailwindcss/turbopack": "^4",
+    "@testing-library/dom": "^10.4.2",
+    "@testing-library/react": "^16.3.3",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.4.3",
+    "jsdom": "^27.0.1",
     "tailwindcss": "^4",
     "typescript": "^5",
     "vitest": "^4.1.12"
