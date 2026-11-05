@@ -25,6 +25,8 @@ const EnvSchema = z.object({
   META_PLAN_MODEL: z.string().min(1).optional(),
   /** Sent as json_schema.strict. The docs say output is schema-constrained either way; Acorn re-validates with Zod. */
   META_STRICT_SCHEMA: z.enum(["true", "false"]).default("false"),
+  /** Attempts per request (1 = never retry). The default of 3 retries 429/500/503 with backoff; set 1 when every request is paid and counted. */
+  META_MAX_ATTEMPTS: z.coerce.number().int().min(1).max(5).default(3),
   ACORN_RETRY_BASE_MS: z.coerce.number().int().min(0).max(10_000).default(750),
   /**
    * Semantic search needs an embedding model. Meta's Model API documents none (dev.meta.ai/docs), so this is off

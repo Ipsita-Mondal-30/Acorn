@@ -26,7 +26,7 @@ its input/output metadata, the memory it belongs to, and (for readings) the segm
 - **Visual aid:** a button on the memory page (never automatic). The prompt contains only the memory's own title, summary,
   extracted statements and bullet points, and instructs the model to add nothing else. The image is stored privately, shown as
   "AI-created illustration / Not source evidence", and regenerating keeps earlier ones.
-- **Explore image:** SAM only says *where*. Boxes are drawn over the **original** image (it is never altered). The user picks a
+- **Explore image (hidden by default):** the panel is shown only when `ACORN_ENABLE_EXPLORE_IMAGE=1`, because SAM 3.1 returned no regions in two live checks. SAM only says *where*. Boxes are drawn over the **original** image (it is never altered). The user picks a
   region, Muse Spark reads it ("AI-read, not verified"), and only **Save as a linked memory** stores it.
 - **Today with Acorn** (`/today`, and the list on Home): built from persisted memories, plans, reminders and artifacts. Every
   entry has a "Why:" line. Nothing is invented; approvals stay with the user.
