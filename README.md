@@ -176,8 +176,8 @@ All Meta calls are server-side and go through one client, `src/lib/ai/meta-clien
 | Code location | `segmentImage()` and `parseBoxes()` in `src/lib/ai/sam.ts`; called by `startSegmentation` in `src/lib/meta-services.ts`; route `src/app/api/memories/[id]/explore/route.ts`; demo boxes in `src/lib/ai/sam-fixtures.ts` |
 | Input | A short noun phrase plus the original saved image |
 | Output | Bounding boxes with confidence, drawn over the original image; masks are not decoded |
-| Invocation | Explore image on an image memory → describe what to find → Find it |
-| Configuration | Same three switches; optional `META_SEGMENTATION_MODEL` |
+| Invocation | Explore image on an image memory → describe what to find → Find it. The panel is hidden unless `ACORN_ENABLE_EXPLORE_IMAGE=1` |
+| Configuration | Same three switches plus `ACORN_ENABLE_EXPLORE_IMAGE=1`; optional `META_SEGMENTATION_MODEL` |
 | Verification | **Live tested, not working for this input.** Two real requests on a text screenshot returned HTTP 200 with zero regions. SAM has not been shown to work on any input in Acorn |
 
 ### Muse Wonder 1.0 (optional)
@@ -357,10 +357,10 @@ Live calls are optional and use **your own** Meta Model API credentials. They ca
 | Understanding notes, links, images and PDFs; intent suggestions; answers; suggested steps | Saving a capture; "Ask Acorn for a suggestion"; asking on Search; "Suggest steps" | `META_PRIMARY_MODEL` (default `muse-spark-1.3`) |
 | Voice transcription | Capture → Voice → Transcribe | `META_TRANSCRIPTION_MODEL` (default `muse-voice-transcribe-1.0`) |
 | Visual aid | "Create visual aid" on a memory | `META_IMAGE_MODEL` (default `muse-image-1.0`) |
-| Explore image, then read a region | "Find it", then choose a region | `META_SEGMENTATION_MODEL` (default `sam-3.1`), then Muse Spark |
+| Explore image, then read a region (hidden unless `ACORN_ENABLE_EXPLORE_IMAGE=1`) | "Find it", then choose a region | `META_SEGMENTATION_MODEL` (default `sam-3.1`), then Muse Spark |
 | Suggested steps by Muse Wonder (optional) | "Suggest steps" with `META_REASONING_FOR_PLANS=true` | `META_REASONING_MODEL` (default `muse-wonder-1.0`) |
 
-**Call budget.** `ACORN_MAX_MODEL_CALLS` is a hard cap per server process (every retry attempt counts; it resets when the server restarts). Retries follow Meta's documented rules: 429, 500 and 503 are retried up to 3 attempts with backoff; 400, 401, 402, 403, 404, 413 and 504 are not. `META_TIMEOUT_MS` sets the per-request timeout.
+**Call budget.** `ACORN_MAX_MODEL_CALLS` is a hard cap per server process (every retry attempt counts; it resets when the server restarts). Retries follow Meta's documented rules: 429, 500 and 503 are retried up to `META_MAX_ATTEMPTS` attempts (default 3) with backoff; 400, 401, 402, 403, 404, 413 and 504 are not. Set `META_MAX_ATTEMPTS=1` so each action sends exactly one paid request. `META_TIMEOUT_MS` sets the per-request timeout.
 
 **Expected costs.** List prices recorded in `src/lib/ai/models.ts` and `src/lib/ai/image.ts` from Meta's documentation (checked 31 Oct to 5 Nov 2026; check the current pricing page before relying on them): Muse Spark 1.3 $1.25 per 1M input tokens and $4.25 per 1M output tokens; Muse Wonder 1.0 $4 / $20; Muse Image 1.0 $0.01 per image; Muse Voice Transcribe 1.0 $0.18 per audio hour; SAM 3.1 $2.50 per 1,000 images. The developer's single live extractions cost roughly $0.009 to $0.015 each at list price. Acorn shows an estimated list-price cost per extraction; it is not a bill.
 
