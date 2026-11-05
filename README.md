@@ -12,6 +12,9 @@ Acorn is a multimodal personal memory and follow-through agent. It helps people 
 4. [Meta AI models and where they are used](#meta-ai-models-and-where-they-are-used)
 5. [TTS and voice architecture](#tts-and-voice-architecture)
 6. [Third-party services and dependencies](#third-party-services-and-dependencies)
+7. [Prerequisites](#prerequisites)
+8. [Local setup — judge instructions](#local-setup--judge-instructions)
+9. [Live Meta API setup](#live-meta-api-setup)
 
 ## What Acorn is
 
@@ -225,3 +228,113 @@ Acorn currently implements voice capture and speech-to-text transcription. Text-
 Not used: OpenAI's own API (no OpenAI SDK or default endpoint; the embeddings client speaks the OpenAI-compatible protocol to whatever URL you give it), Redis, Docker, and Cloudflare (the docs only mention running your own `cloudflared` tunnel by hand for phone testing; nothing in the app depends on it).
 
 Main packages (all installed from npm by `npm ci`): `next` 16.4.3, `react` / `react-dom` 19.3.0, `@supabase/supabase-js` and `@supabase/ssr`, `zod` 4, `server-only` (all MIT); development only: `typescript` (Apache-2.0), `tailwindcss` 4 and `@tailwindcss/turbopack`, `eslint` 9 with `eslint-config-next`, `vitest` 4, `jsdom`, `@testing-library/react` and `@testing-library/dom` (MIT), and `@electric-sql/pglite` (Apache-2.0, an in-process Postgres used only by tests). `sharp` (Apache-2.0, installed with Next.js) is used only by `scripts/make-samples.mjs`.
+
+## Prerequisites
+
+| Requirement | Details |
+|---|---|
+| Node.js | **22 LTS (22.13 or newer) or 24+ recommended.** `package.json` allows `>=20.9`, but some development tools (Vitest 4, ESLint 9) declare `^20.19 \|\| ^22.13 \|\| >=24`. Tested end to end with Node 23.10.0, which works but makes `npm ci` print `EBADENGINE` warnings |
+| Package manager | npm (ships with Node; tested with 10.9.2). Use `npm ci` so the exact versions in `package-lock.json` are installed |
+| Operating system | Developed and tested on macOS. Linux should work but was not tested. Windows was not tested: `npm run demo` starts `npx` without a shell and `npm run reset-demo` uses `rm -rf`, so use WSL on Windows |
+| Docker / database | **Not needed.** The demo stores everything in a local folder |
+| Ports | `3200` for `npm run demo` (change with `-- --port <n>`); `3000` for `npm run dev` |
+| Browser | A current Chrome, Edge, Firefox or Safari. Voice recording needs microphone permission (`localhost` counts as a secure context) |
+| Network | Only to install packages. The demo itself makes no outbound requests |
+| Optional API keys | Your own Meta Model API key for live calls; optionally Supabase, an embeddings service or Resend. None is needed for the demo |
+
+## Local setup — judge instructions
+
+These steps need no account and no key, and were tested from a fresh clone (macOS, Node 23.10.0, 5 Nov 2026).
+
+```bash
+# 1. Clone the public repository
+git clone https://github.com/Ipsita-Mondal-30/Acorn.git
+cd Acorn
+
+# 2. Install the exact dependency versions
+npm ci
+
+# 3. Copy the configuration template (optional for the demo; every value in it is a safe default)
+cp .env.example .env.local
+
+# 4. Meta credentials: skip this for the offline demo. See "Live Meta API setup" below.
+
+# 5. Start the isolated demo
+npm run demo
+```
+
+6. Open **<http://localhost:3200>**. The terminal prints what is real and what is not:
+
+   ```
+   Acorn demo on http://localhost:3200
+     Mode ............ demo: no model is called, nothing is sent anywhere, no account
+     Your own data ... untouched (the demo uses .demo-data/)
+     Muse Spark ...... no saved real result found: every reading is the labelled mock
+   ```
+
+   The header of every page says **Demo mode — no model calls** and **Local demo storage**. The first page load seeds fictional sample memories, each tagged **Sample**.
+
+7. **Deliver due reminders** (what a scheduler would do), in a second terminal from the same folder, while the demo is running:
+
+   ```bash
+   npm run demo:tick          # add -- --port <n> if you started the demo on another port
+   ```
+
+   It prints the counts, for example `200 {"ok":true,"queued":1,"skipped":0,"sent":1,...}`. Due reminders then appear in the Inbox. Email is never sent in the demo.
+
+8. **Stop** with `Ctrl+C` in the terminal running `npm run demo`.
+
+9. **Reset the demo data**: `rm -rf .demo-data` (it is recreated with the samples on the next start). `npm run reset-demo` deletes `.data/`, which `npm run dev` uses, not the demo's folder.
+
+Other ways to run it:
+
+| Command | What it does |
+|---|---|
+| `npm run demo -- --port 3300` | The same demo on another port |
+| `npm run build` then `npm run demo -- --prod` | The demo on a production build |
+| `npm run dev` | The normal dev server on port 3000, configured by `.env.local`. With the template's defaults it is also offline (mock provider, local storage) but keeps data in `.data/` |
+
+**What `npm run demo` forces**, whatever `.env.local` says (process environment beats `.env` files in Next.js; see `scripts/demo-env.mjs`):
+
+| Setting | Value in the demo |
+|---|---|
+| `ACORN_STORAGE` / `ACORN_DATA_DIR` | `local` / `.demo-data/` (never `.data/`, no Supabase) |
+| `AI_PROVIDER` / `AI_ENABLE_REAL_CALLS` / `ACORN_MAX_MODEL_CALLS` | `mock` / `false` / `0` |
+| `META_API_KEY` | empty, so no key can be used even by mistake |
+| `EMBEDDING_PROVIDER` / `EMAIL_PROVIDER` / `NOTIFICATIONS_ENABLE_SENDING` | `none` / `none` / `false` |
+| `CRON_SECRET` | 48 random hex characters generated into `.demo-data/.cron-secret` (file mode 600), never printed |
+| `ACORN_DEMO_REPLAY` | `1` only if the saved real result file exists locally (it does not in a fresh clone) |
+
+No public tunnel, external account or private Supabase project is involved.
+
+## Live Meta API setup
+
+Live calls are optional and use **your own** Meta Model API credentials. They can incur charges on your account.
+
+1. **Get a key** through Meta's official developer workflow for the Meta Model API: follow the quickstart in the documentation at <https://dev.meta.ai/docs>. You can check which models your key can use with `GET https://api.meta.ai/v1/models` (authenticated with `Authorization: Bearer <your key>`).
+2. **Put it in `.env.local` only** (git ignores it; never put a real key in `.env.example` or any committed file):
+
+   ```bash
+   AI_PROVIDER=meta
+   AI_ENABLE_REAL_CALLS=true
+   META_API_KEY=<your-meta-model-api-key>
+   ACORN_MAX_MODEL_CALLS=10        # safe call budget for this server process
+   ```
+
+3. **Run the normal server, not the demo**: `npm run dev`, then open <http://localhost:3000>. (`npm run demo` deliberately ignores the key.) The header should read **Meta mode — muse-spark-1.3**. `GET /api/health` reports the provider, whether a key is present (yes/no, never the value), whether real calls are on and the call count, without calling any model.
+
+| Integration | Triggered by | Model setting |
+|---|---|---|
+| Understanding notes, links, images and PDFs; intent suggestions; answers; suggested steps | Saving a capture; "Ask Acorn for a suggestion"; asking on Search; "Suggest steps" | `META_PRIMARY_MODEL` (default `muse-spark-1.3`) |
+| Voice transcription | Capture → Voice → Transcribe | `META_TRANSCRIPTION_MODEL` (default `muse-voice-transcribe-1.0`) |
+| Visual aid | "Create visual aid" on a memory | `META_IMAGE_MODEL` (default `muse-image-1.0`) |
+| Explore image, then read a region | "Find it", then choose a region | `META_SEGMENTATION_MODEL` (default `sam-3.1`), then Muse Spark |
+| Suggested steps by Muse Wonder (optional) | "Suggest steps" with `META_REASONING_FOR_PLANS=true` | `META_REASONING_MODEL` (default `muse-wonder-1.0`) |
+
+**Call budget.** `ACORN_MAX_MODEL_CALLS` is a hard cap per server process (every retry attempt counts; it resets when the server restarts). Retries follow Meta's documented rules: 429, 500 and 503 are retried up to 3 attempts with backoff; 400, 401, 402, 403, 404, 413 and 504 are not. `META_TIMEOUT_MS` sets the per-request timeout.
+
+**Expected costs.** List prices recorded in `src/lib/ai/models.ts` and `src/lib/ai/image.ts` from Meta's documentation (checked 31 Oct to 5 Nov 2026; check the current pricing page before relying on them): Muse Spark 1.3 $1.25 per 1M input tokens and $4.25 per 1M output tokens; Muse Wonder 1.0 $4 / $20; Muse Image 1.0 $0.01 per image; Muse Voice Transcribe 1.0 $0.18 per audio hour; SAM 3.1 $2.50 per 1,000 images. The developer's single live extractions cost roughly $0.009 to $0.015 each at list price. Acorn shows an estimated list-price cost per extraction; it is not a bill.
+
+**One-request checks (paid, optional).** `npm run meta:check` sends exactly one Muse Spark text request and refuses unless `AI_PROVIDER=meta`, `AI_ENABLE_REAL_CALLS=true` and `META_API_KEY` are set. The other checks need explicit confirmation on the command line, for example `META_LIVE_CONFIRM=voice META_KEY_ROTATED=yes npm run meta:live:voice` (also `image`, `sam`, `region`); each allows one attempt and writes a sanitised result to `artifacts/meta-live/` (gitignored). `npm run meta:live:dryrun` runs the same harness against a stubbed API with a fake key: no network, no cost.
+
+**Switch back to offline mode.** Set `AI_PROVIDER=mock` (or `AI_ENABLE_REAL_CALLS=false`) in `.env.local` and restart, or simply use `npm run demo`, which forces everything off. Remove your key from `.env.local` when you are done.
