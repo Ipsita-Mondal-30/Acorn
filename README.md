@@ -72,7 +72,7 @@ The two never mix: with Supabase configured, every page and API call needs a sig
    NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon key>
    ```
    The newer `sb_publishable_…` key also goes in `NEXT_PUBLIC_SUPABASE_ANON_KEY`. `DATABASE_URL` / `DIRECT_URL` are for applying migrations from your machine only; the running app never reads them, and a password containing `@ / ? # [ ]` must be percent-encoded. `SUPABASE_SERVICE_ROLE_KEY` is optional and never used by the running app (see Security below).
-3. **Apply the migrations**, in filename order (`20261031000000_initial_schema.sql`, `20261031010000_multimodal_memory.sql`, `20261031020000_reminders.sql`). Either use the CLI, or paste each file into Dashboard → SQL editor and run it:
+3. **Apply the migrations**, in filename order (`20261031000000_initial_schema.sql`, `20261031010000_multimodal_memory.sql`, `20261031020000_reminders.sql`, and for semantic search only `20261031030000_memory_embeddings.sql` then `20261101000000_pgvector_embeddings.sql`, and for plans/reminders/CV `20261102000000_agent_plans.sql`; see [docs/pgvector.md](docs/pgvector.md)). Either use the CLI, or paste each file into Dashboard → SQL editor and run it:
    ```bash
    npx supabase login
    npx supabase link --project-ref <ref>
@@ -142,6 +142,76 @@ Not stated in the docs, so not assumed: whether Muse Spark returns page referenc
 ### Evaluation
 
 `npm run eval` (or `npx vitest run tests/eval.test.ts`) runs the labelled cases in `evals/dataset.json` through the real capture pipeline in demo mode and prints scores for classification, entities, deadlines, intent, quote preservation, retrieval and answers, with every miss listed. **These measure the demo heuristics on 18 cases that the heuristics were developed alongside, so they are not held-out and not a measure of any Meta model.** The assertions are regression floors, not accuracy claims. When credits exist, point the same dataset at Meta mode to get real numbers.
+
+## Semantic (meaning-based) search
+
+Search is **hybrid**: keyword matching (stemming, field weights, Postgres full-text) plus embedding similarity, blended
+into one ranking. Semantic scores add candidates and weight; the reasons shown still say *why* each memory matched
+("Close in meaning to your search" when no exact word did).
+
+**Status: the code is complete, but semantic search is awaiting an embedding provider.** Meta's Model API
+(dev.meta.ai/docs, checked 2026-10-31) documents no embeddings endpoint and no embedding model: only chat completions,
+responses, messages, images, voice, files and models. Nothing is faked: with `EMBEDDING_PROVIDER=none` (default)
+search is keyword-only and says so.
+
+To enable it you must choose a provider that exposes an OpenAI-compatible `POST {base}/embeddings` and accept its price
+(embeddings are billed per input token; a memory is ~100–1500 tokens, so indexing hundreds of memories is typically
+cents, but check your provider's rate). Then set in `.env.local`:
+
+```
+EMBEDDING_PROVIDER=http
+EMBEDDING_BASE_URL=https://<provider>/v1
+EMBEDDING_API_KEY=...
+EMBEDDING_MODEL=<model id>
+EMBEDDING_DIMENSIONS=        # optional
+AI_ENABLE_REAL_CALLS=true    # embeddings are paid calls, behind the same switch
+```
+
+Embeddings live in Supabase Postgres with **pgvector** (`20261031030000_memory_embeddings.sql` creates the table,
+`20261101000000_pgvector_embeddings.sql` adds the `vector` column and the `match_memories` similarity function, both with
+RLS and composite foreign keys). The vector dimension is deliberately not fixed until a model is chosen. Migration,
+backfill (`POST /api/embeddings`, safe to repeat), verification, rollback, ranking settings and testing are in
+[docs/pgvector.md](docs/pgvector.md). Failure to embed never fails a capture or a search.
+
+Tests use a deterministic, clearly labelled concept embedder (`tests/helpers/fake-embedder.ts`); no network, no cost.
+The pgvector SQL is tested against a real throwaway PostgreSQL (`tests/pgvector.integration.test.ts`; skipped, visibly, if PostgreSQL with pgvector isn't installed).
+The HTTP provider itself has only been tested against a stubbed `fetch`, not a live service.
+
+### Two-account isolation test
+See [docs/two-user-isolation-test.md](docs/two-user-isolation-test.md).
+
+## The agent: from a saved memory to an approved plan (phase 4)
+
+Acorn's loop is capture → understand → remember → decide → act → verify → follow through. The "act" part is deliberately
+small and honest: Acorn prepares things inside the app and never acts on the outside world.
+
+- **Intent first.** Acorn only *suggests* why you saved something (labelled "not confirmed", with its evidence and confidence). A plan is made only after **you** confirm the intent.
+- **Plans are data.** A typed `Plan` (goal, context, ordered steps, dependencies, permissions, expected outcome, verification, failure conditions) built from fixed templates over real data in the memory, validated before it is stored. No model writes steps or picks tools.
+- **A controlled tool registry** (`src/lib/agent/tools.ts`): retrieve memory, search memories, read document, read CV, compare job to CV, extract recipe, build shopping list, draft resume, draft cover letter, draft email, create checklist, create reminder, update action status. Each has typed input and output, declared permissions, owner-scoped data access, and a separate `verify()` that re-checks the result.
+- **No outside actions exist.** There is no tool or permission for sending, submitting, paying or contacting anyone. Steps like "apply on the employer's site" belong to you, and finish only when you record what happened.
+- **Approval and verification.** Nothing runs until you approve the plan and its permission list. Each draft waits for your review (you can edit it; your changes are marked as yours). The plan's action goes through the existing state machine and can only be completed from verified evidence; the actions API refuses to move a plan's action by hand.
+- **Workflows:** job application (compare requirements with your CV, tailored resume, cover letter, checklist, deadline reminder, your own "I applied" evidence), recipe (ingredients with parsed quantities, shopping list you can edit, optional cooking reminder; substitutions are labelled *inferred*), and a generic follow-through plan for the other intents (reconnect, attend, learn, buy, ...).
+- **Honest by construction.** Resume and cover letter are built only from lines of **your** CV, copied unchanged; requirements your CV doesn't show become gaps and `[TO COMPLETE]` markers; "3+ years" claims are flagged for you to check. These drafts are deterministic (no model call, no cost).
+- **Reminders** (`/reminders`): create, edit, complete, snooze, dismiss, reopen; linked to the memory and the action.
+
+Needs migrations `20261102000000_agent_plans.sql`, `20261103000000_cv_documents.sql` and `20261103010000_follow_up_intent.sql`. Until they are applied the memory page still works; plans can't be made. Backup, apply, verify and rollback steps: [docs/phase4-migration.md](docs/phase4-migration.md).
+Details and the guarantees are in [docs/agent.md](docs/agent.md).
+
+### Phase 4.5: your CV, better matching, follow-ups
+- **CV upload:** a PDF, Word (.docx) or text file, or pasted text. The original is kept as uploaded in private storage under your own folder; Acorn reads the text out of it (no OCR: a scanned PDF is refused with a clear message), then parses name and contact, roles with dates, projects, skills, education and certifications. Every parsed item points to its place in the text. Replacing a CV keeps the old version; "Read the original again" re-parses; "Remove" deletes every version and file.
+- **Matching:** each job requirement becomes VERIFIED_MATCH, POTENTIAL_MATCH, UNVERIFIED or MISSING with the CV's exact words as evidence, an explanation, a rule-based confidence and whether you must confirm. Years need dates; a similar meaning (embeddings, optional, paid, needs your approval on the plan) can only ever be a potential match. Results: `npm run eval:agent` (see `evals/agent-results.md`).
+- **Drafts:** the resume and cover letter use only your CV's own words (every line has a span into your CV); what your CV doesn't back is left as `[TO COMPLETE]` and listed. You confirm or reject each ambiguous match, and anything you edit is scanned for words and numbers that are in neither your CV nor the job.
+- **Follow-up** is its own intent ("follow up on it"): suggested only from your own words (with the quote shown), drafts that claim no past conversation, and a reminder date you choose.
+- **Recipes:** ingredient names normalised and merged, ranges and fractions read, servings rescaled from the extracted amounts, instructions quoted from the saved text, and substitutions kept apart and labelled inferred.
+
+
+## Proactive reminders and notifications (phase 5)
+
+Acorn can nudge you, within limits you set: in-app inbox and optional email, with quiet hours, a daily limit, your own time zone and an optional morning briefing. A reminder is announced once; snoozing or moving it gives the new time its own notification; Acorn never moves your dates or repeats itself. Reminders created from an intent need an intent **you confirmed**. A scheduled worker (`POST /api/cron/tick`, protected by `CRON_SECRET`) does the delivery, idempotently, with retries and a readable history. Real email is off unless four separate settings are on. Design, rules, security and the steps to switch it on are in [docs/notifications.md](docs/notifications.md); the migration is `20261104000000_notifications.sql` (unapplied).
+
+## Going live
+
+The safe, ordered plan for real use (credentials to rotate, backing up and applying the four pending migrations with verification and rollback, scheduler activation, end-to-end smoke tests, monitoring, costs and what still blocks) is in [docs/production-activation.md](docs/production-activation.md). `npm run audit:secrets` checks that no secret is in anything git could commit or the browser downloads.
 
 ## Architecture
 
